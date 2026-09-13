@@ -13,6 +13,7 @@ import { SwabView } from './components/SwabView';
 import { FailureAnalysisView } from './components/FailureAnalysisView';
 import { MeetingNotesView } from './components/MeetingNotesView';
 import { SystemHealthView } from './components/SystemHealthView';
+import { MobileLiquidDock } from './components/MobileLiquidDock';
 import { api } from './services/api';
 import {
   Equipment,
@@ -86,8 +87,8 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen h-[100dvh] overflow-hidden bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
-      {/* Collapsible / Responsive Sidebar */}
+    <div className="flex h-screen h-[100dvh] overflow-hidden bg-[#f1f5f9] text-slate-800 antialiased selection:bg-blue-600 selection:text-white">
+      {/* Capsule Collapsible Sidebar (Desktop) / Slide-over Drawer (Mobile) */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={tab => setCurrentTab(tab)}
@@ -102,7 +103,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Pane */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Top Header */}
         <Header
           currentTab={currentTab}
@@ -115,90 +116,99 @@ export const App: React.FC = () => {
         />
 
         {/* Viewport Scroll Container */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {loading ? (
-            <div className="h-96 flex flex-col items-center justify-center space-y-3">
-              <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
-              <p className="text-sm font-medium text-slate-400">
-                Menghubungkan ke backend WOSys ERP...
-              </p>
-            </div>
-          ) : (
-            <>
-              {currentTab === 'dashboard' && (
-                <DashboardView
-                  equipments={equipments}
-                  workOrders={workOrders}
-                  backlogs={backlogs}
-                  dailyHms={dailyHms}
-                  onNavigate={tab => setCurrentTab(tab)}
-                />
-              )}
-              {currentTab === 'fleet' && (
-                <EquipmentView equipments={equipments} onRefresh={loadData} />
-              )}
-              {currentTab === 'wo' && (
-                <WorkOrdersView
-                  workOrders={workOrders}
-                  equipments={equipments}
-                  onRefresh={loadData}
-                />
-              )}
-              {currentTab === 'backlog' && (
-                <BacklogView
-                  backlogs={backlogs}
-                  equipments={equipments}
-                  onRefresh={loadData}
-                />
-              )}
-              {currentTab === 'daily_hm' && (
-                <DailyHmView
-                  dailyHms={dailyHms}
-                  equipments={equipments}
-                  onRefresh={loadData}
-                />
-              )}
-              {currentTab === 'p2h' && (
-                <P2hInspectionView equipments={equipments} onRefresh={loadData} />
-              )}
-              {currentTab === 'parts' && (
-                <PartsStockView parts={parts} onRefresh={loadData} />
-              )}
-              {currentTab === 'tools' && (
-                <ToolsTrackerView tools={tools} onRefresh={loadData} />
-              )}
-              {currentTab === 'swab' && (
-                <SwabView swabs={swabs} equipments={equipments} onRefresh={loadData} />
-              )}
-              {currentTab === 'far' && (
-                <FailureAnalysisView fars={fars} equipments={equipments} onRefresh={loadData} />
-              )}
-              {currentTab === 'meetings' && (
-                <MeetingNotesView notes={meetingNotes} onRefresh={loadData} />
-              )}
-              {currentTab === 'system' && (
-                <SystemHealthView
-                  latency={latency}
-                  apiOnline={apiOnline}
-                  onRefresh={loadData}
-                />
-              )}
-            </>
-          )}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 relative bg-[#f1f5f9] pb-24 md:pb-8">
+          <div className="max-w-[1440px] mx-auto">
+            {loading ? (
+              <div className="h-96 flex flex-col items-center justify-center space-y-3">
+                <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  Menghubungkan ke backend WOSys ERP...
+                </p>
+              </div>
+            ) : (
+              <>
+                {currentTab === 'dashboard' && (
+                  <DashboardView
+                    equipments={equipments}
+                    workOrders={workOrders}
+                    backlogs={backlogs}
+                    dailyHms={dailyHms}
+                    onNavigate={tab => setCurrentTab(tab)}
+                  />
+                )}
+                {currentTab === 'fleet' && (
+                  <EquipmentView equipments={equipments} onRefresh={loadData} />
+                )}
+                {currentTab === 'wo' && (
+                  <WorkOrdersView
+                    workOrders={workOrders}
+                    equipments={equipments}
+                    onRefresh={loadData}
+                  />
+                )}
+                {currentTab === 'backlog' && (
+                  <BacklogView
+                    backlogs={backlogs}
+                    equipments={equipments}
+                    onRefresh={loadData}
+                  />
+                )}
+                {currentTab === 'daily_hm' && (
+                  <DailyHmView
+                    dailyHms={dailyHms}
+                    equipments={equipments}
+                    onRefresh={loadData}
+                  />
+                )}
+                {currentTab === 'p2h' && (
+                  <P2hInspectionView equipments={equipments} onRefresh={loadData} />
+                )}
+                {currentTab === 'parts' && (
+                  <PartsStockView parts={parts} onRefresh={loadData} />
+                )}
+                {currentTab === 'tools' && (
+                  <ToolsTrackerView tools={tools} onRefresh={loadData} />
+                )}
+                {currentTab === 'swab' && (
+                  <SwabView swabs={swabs} equipments={equipments} onRefresh={loadData} />
+                )}
+                {currentTab === 'far' && (
+                  <FailureAnalysisView fars={fars} equipments={equipments} onRefresh={loadData} />
+                )}
+                {currentTab === 'meetings' && (
+                  <MeetingNotesView notes={meetingNotes} onRefresh={loadData} />
+                )}
+                {currentTab === 'system' && (
+                  <SystemHealthView
+                    latency={latency}
+                    apiOnline={apiOnline}
+                    onRefresh={loadData}
+                  />
+                )}
+              </>
+            )}
+          </div>
         </main>
 
         {/* Footer Bar */}
-        <footer className="h-9 flex-shrink-0 border-t border-slate-800/80 bg-slate-950 px-4 sm:px-6 flex items-center justify-between text-[11px] text-slate-500">
+        <footer className="h-9 flex-shrink-0 border-t border-slate-200/80 bg-white px-4 sm:px-6 flex items-center justify-between text-[11px] text-slate-500 font-medium z-10">
           <div className="flex items-center space-x-2">
-            <span>WOSys Enterprise Maintenance ERP</span>
+            <span className="font-bold text-slate-700">WOSys ERP</span>
             <span>•</span>
-            <span className="text-emerald-400 font-semibold">React 18 + SQLite WAL</span>
+            <span>PT. Benamakmur Selaras Sejahtera</span>
+            <span>•</span>
+            <span className="text-blue-600 font-bold">React 18 + SQLite WAL</span>
           </div>
-          <div className="flex items-center space-x-2 text-slate-400">
-            <span>API Server:</span>
-            <span className="font-mono text-emerald-400 font-bold">127.0.0.1:8003</span>
+          <div className="hidden sm:flex items-center space-x-2 text-slate-400">
+            <span>Plant Maintenance System</span>
           </div>
         </footer>
+
+        {/* Mobile Liquid Navigation Dock (floating bottom) */}
+        <MobileLiquidDock
+          currentTab={currentTab}
+          onSelectTab={tab => setCurrentTab(tab)}
+        />
       </div>
     </div>
   );

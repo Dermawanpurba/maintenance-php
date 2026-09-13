@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, RefreshCw, Download, Database, ShieldCheck } from 'lucide-react';
+import { Menu, RefreshCw, Download, Shield, ExternalLink, Activity } from 'lucide-react';
 import { NavTab } from './Sidebar';
 
 interface HeaderProps {
@@ -12,19 +12,67 @@ interface HeaderProps {
   onBackup: () => void;
 }
 
-const titles: Record<NavTab, { title: string; subtitle: string }> = {
-  dashboard: { title: 'Executive Overview', subtitle: 'Ringkasan performa pemeliharaan armada & operasional' },
-  fleet: { title: 'Monitoring Armada Unit', subtitle: 'Kesiapan unit alat berat, lokasi site, dan status operasional' },
-  wo: { title: 'Surat Perintah Kerja (WO)', subtitle: 'Pencatatan dan pelacakan pekerjaan perbaikan alat' },
-  backlog: { title: 'Daftar Backlog & Defect', subtitle: 'Temuan defect tertunda dan kebutuhan suku cadang' },
-  daily_hm: { title: 'Log Hour Meter & Fuel Intake', subtitle: 'Pencatatan akumulasi jam operasi dan konsumsi BBM' },
-  p2h: { title: 'Inspeksi Kelayakan Harian (P2H)', subtitle: 'Checklist pre-start inspection keselamatan alat' },
-  parts: { title: 'Katalog Sparepart & Gudang', subtitle: 'Stok suku cadang, lokasi penyimpanan rak, dan batas minimum' },
-  tools: { title: 'Special Tools Tracker', subtitle: 'Monitoring peminjaman dan kalibrasi perkakas kerja' },
-  swab: { title: 'Swab & Kanibalisasi Part', subtitle: 'Dokumentasi pemindahan komponen antar unit armada' },
-  far: { title: 'Laporan Analisis Kerusakan (FAR)', subtitle: 'Investigasi kegagalan komponen dan tindakan pencegahan' },
-  meetings: { title: 'Notulen Rapat Operasional Plant', subtitle: 'Pencatatan keputusan rapat evaluasi maintenance mingguan' },
-  system: { title: 'Status Sistem & Pencadangan', subtitle: 'Audit log, konkurensi SQLite WAL, dan arsip .ZIP 1-klik' },
+const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> = {
+  dashboard: {
+    title: 'Executive Plant Management & Strategic KPI Hub',
+    subtitle: 'Ringkasan performa pemeliharaan armada, Physical Availability (PA), & downtime',
+    tag: 'EXECUTIVE KPI'
+  },
+  fleet: {
+    title: 'Master Unit & Monitoring Armada Alat Berat',
+    subtitle: 'Kesiapan unit alat berat, lokasi site, dan status operasional (RFU / RWN / BD)',
+    tag: 'FLEET MANAGEMENT'
+  },
+  wo: {
+    title: 'Work Order Hub & Surat Perintah Kerja',
+    subtitle: 'Pencatatan, delegasi mekanik, dan pelacakan riwayat servis breakdown',
+    tag: 'WORK ORDERS'
+  },
+  backlog: {
+    title: 'Backlog Management & Defect Register',
+    subtitle: 'Daftar temuan defect inspeksi, urgensi penanganan, dan antrean suku cadang',
+    tag: 'DEFECT LOG'
+  },
+  daily_hm: {
+    title: 'Log Hour Meter & Pemakaian Bahan Bakar',
+    subtitle: 'Pencatatan akumulasi jam operasi (HM) harian dan konsumsi solar/fuel',
+    tag: 'HOUR METER'
+  },
+  p2h: {
+    title: 'P2H & Checklist Inspeksi Harian',
+    subtitle: 'Pemeriksaan kelayakan unit sebelum beroperasi (Pre-Start Safety Inspection)',
+    tag: 'INSPECTION'
+  },
+  parts: {
+    title: 'Master Sparepart & Manajemen Gudang',
+    subtitle: 'Katalog suku cadang, lokasi rak workshop, pergerakan stok, dan reorder point',
+    tag: 'WAREHOUSE'
+  },
+  tools: {
+    title: 'Master Perkakas & Special Tools Tracker',
+    subtitle: 'Monitoring inventaris tools mekanik, status peminjaman, dan kalibrasi alat',
+    tag: 'TOOLS'
+  },
+  swab: {
+    title: 'Swab & Kanibalisasi Komponen',
+    subtitle: 'Dokumentasi resmi transfer komponen antar unit dengan nomor serial valid',
+    tag: 'RELIABILITY'
+  },
+  far: {
+    title: 'Failure Analysis Report (FAR)',
+    subtitle: 'Laporan investigasi kegagalan teknis komponen dan evaluasi akar masalah (RCA)',
+    tag: 'ANALYSIS'
+  },
+  meetings: {
+    title: 'Notulen Rapat & Koordinasi Plant Bulanan',
+    subtitle: 'Catatan hasil evaluasi mingguan, target KPI, dan instruksi manajemen plant',
+    tag: 'COORDINATION'
+  },
+  system: {
+    title: 'System Control, Konkurensi & Pencadangan',
+    subtitle: 'Monitoring database SQLite WAL lokal, audit trail, dan arsip data .ZIP 1-klik',
+    tag: 'SYSTEM'
+  }
 };
 
 export const Header: React.FC<HeaderProps> = ({
@@ -36,53 +84,90 @@ export const Header: React.FC<HeaderProps> = ({
   refreshing,
   onBackup
 }) => {
-  const current = titles[currentTab] || { title: 'WOSys ERP', subtitle: 'Maintenance Management' };
+  const current = titles[currentTab] || {
+    title: 'WOSys ERP Management',
+    subtitle: 'PT. Benamakmur Selaras Sejahtera',
+    tag: 'MAINTENANCE'
+  };
 
   return (
-    <header className="h-16 flex-shrink-0 border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between z-20">
-      <div className="flex items-center space-x-3">
+    <header className="h-16 flex-shrink-0 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+      {/* Left: Hamburger + Title info */}
+      <div className="flex items-center space-x-3 min-w-0">
         <button
           onClick={onOpenSidebar}
-          className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 lg:hidden"
+          className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 md:hidden transition-colors"
+          title="Buka Menu"
+          type="button"
         >
           <Menu className="w-5 h-5" />
         </button>
-        <div>
-          <h2 className="text-sm sm:text-base font-bold text-white tracking-tight leading-none">
-            {current.title}
-          </h2>
-          <p className="text-[11px] text-slate-400 font-medium hidden sm:block mt-1">
+
+        <div className="flex flex-col min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-extrabold text-[9.5px] uppercase tracking-wider hidden sm:inline-block border border-blue-200/60">
+              {current.tag}
+            </span>
+            <h2 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight truncate">
+              {current.title}
+            </h2>
+          </div>
+          <p className="text-[11px] text-slate-500 font-medium truncate hidden md:block">
             {current.subtitle}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center space-x-2 sm:space-x-3">
-        {/* Latency badge */}
-        <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
-          <span className={`w-2 h-2 rounded-full ${apiOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-          <span className="font-mono text-[11px]">{latency}ms</span>
+      {/* Right: Actions & Badges */}
+      <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+        {/* Latency / API status */}
+        <div className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold">
+          <span
+            className={`w-2 h-2 rounded-full ${
+              apiOnline
+                ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse'
+                : 'bg-rose-500'
+            }`}
+          />
+          <span className="text-[11px] font-mono">{latency}ms</span>
         </div>
 
         {/* Reload button */}
         <button
           onClick={onRefresh}
           disabled={refreshing}
-          className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 transition-colors"
-          title="Sinkronisasi Ulang Data"
+          className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors"
+          title="Sinkronkan Data"
+          type="button"
         >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-emerald-400' : ''}`} />
+          <RefreshCw
+            className={`w-4 h-4 ${refreshing ? 'animate-spin text-blue-600' : ''}`}
+          />
         </button>
 
         {/* 1-Click Backup */}
         <button
           onClick={onBackup}
-          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-950/40 transition-all hover:-translate-y-0.5"
-          title="Unduh Backup Lengkap .ZIP"
+          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold shadow-sm transition-all hover:shadow-md active:scale-95"
+          title="Unduh Backup Database .ZIP"
+          type="button"
         >
           <Download className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Backup .ZIP</span>
         </button>
+
+        {/* Filament Admin Link */}
+        <a
+          href="/admin"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold shadow-sm transition-all hover:shadow-md"
+          title="Buka Filament 5 Admin Panel"
+        >
+          <Shield className="w-3.5 h-3.5 text-blue-400" />
+          <span>Admin</span>
+          <ExternalLink className="w-3 h-3 text-slate-400" />
+        </a>
       </div>
     </header>
   );

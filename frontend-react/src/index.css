@@ -1,31 +1,184 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  --theme-main: #0f172a;
+  --theme-accent: #3b82f6;
+  --theme-text: #ffffff;
+  --primary-bg: #0f172a;
+  --nav-body-bg: #f1f5f9;
 }
 
 body {
   margin: 0;
-  background-color: #020617;
-  color: #f8fafc;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  overflow: hidden;
+  font-size: 13px;
+  background-color: #f1f5f9;
+  color: #1e293b;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Sleek Scrollbar */
+/* Glass Card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* Capsule Sidebar Styles (Desktop) */
+@media (min-width: 768px) {
+  .capsule-sidebar {
+    position: sticky;
+    top: 14px;
+    height: calc(100vh - 28px);
+    margin: 14px 0 14px 14px;
+    border-radius: 28px;
+    background: linear-gradient(180deg, #0f172a 0%, #060a13 100%);
+    box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 40;
+    overflow: visible !important;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .capsule-sidebar.expanded {
+    width: 265px !important;
+  }
+
+  .capsule-sidebar.collapsed {
+    width: 78px !important;
+  }
+}
+
+/* Sidebar Collapse Toggle Button */
+.sidebar-collapse-btn {
+  position: absolute;
+  top: 24px;
+  right: -15px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  cursor: pointer;
+  z-index: 50;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-collapse-btn:hover {
+  background: #3b82f6;
+  border-color: #ffffff;
+  transform: scale(1.1);
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.4);
+}
+
+/* Scrollbar for Sidebar Nav */
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Sleek Scrollbar for Main Canvas */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: #f1f5f9;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.6);
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.9);
+  background: #94a3b8;
+}
+
+/* Mobile Liquid Navigation Dock */
+.liquid-navigation-container {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  z-index: 85;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  user-select: none;
+}
+
+.liquid-dock {
+  position: relative;
+  width: 390px;
+  max-width: calc(100vw - 24px);
+  height: 66px;
+  background: #0f172a;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  border-radius: 20px;
+  box-shadow: 0 15px 35px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  padding: 0 10px;
+}
+
+.dock-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 100%;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.dock-item .dock-icon {
+  font-size: 1.25rem;
+  color: rgba(255, 255, 255, 0.65);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dock-item:hover .dock-icon {
+  color: #ffffff;
+}
+
+.dock-item.active .dock-icon {
+  transform: translateY(-4px);
+  color: #38bdf8;
+}
+
+.dock-item .dock-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 0.3s ease;
+  margin-top: 2px;
+}
+
+.dock-item.active .dock-label {
+  color: #ffffff;
+  font-weight: 800;
 }
