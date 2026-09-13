@@ -15,6 +15,8 @@ storage/framework/views/*
 vendor/
 node_modules/
 tests/
+bootstrap/cache/*.php
+!bootstrap/cache/.gitkeep
 frontend-react/node_modules/
 frontend-react/dist/
 .vscode/

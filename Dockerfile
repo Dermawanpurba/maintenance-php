@@ -1,5 +1,15 @@
 # ==========================================
-# Production Dockerfile: PHP 8.4-FPM Alpine + Nginx + Composer + SQLite
+# Stage 1: Build React Vite Frontend (Node.js 20 Alpine)
+# ==========================================
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/frontend-react
+COPY frontend-react/package*.json ./
+RUN npm install
+COPY frontend-react/ ./
+RUN npm run build
+
+# ==========================================
+# Stage 2: PHP 8.4-FPM Alpine + Nginx + Composer + SQLite
 # ==========================================
 FROM php:8.4-fpm-alpine
 
@@ -28,13 +38,11 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy application files (including pre-built public_frontend and public)
+# Copy application backend files
 COPY . .
 
-# Ensure public_frontend is populated with production React SPA assets
-RUN if [ ! -d "/var/www/html/public_frontend" ] || [ ! -f "/var/www/html/public_frontend/index.html" ]; then \
-        mkdir -p /var/www/html/public_frontend && cp -r /var/www/html/public/* /var/www/html/public_frontend/ || true; \
-    fi
+# Copy built frontend dist to public_frontend
+COPY --from=frontend-builder /app/frontend-react/dist /var/www/html/public_frontend
 
 # Install Laravel dependencies (PHP 8.4 compliant, production)
 RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-req=php+
