@@ -51,13 +51,18 @@ export interface WorkOrder {
 
 export interface Backlog {
   id?: number | string;
+  item_id?: string;
   tanggal?: string;
-  no_unit: string;
-  deskripsi: string;
-  prioritas: string;
-  status: string; // PENDING, ORDERED, READY, CLOSED
+  equip_no?: string;
+  no_unit?: string;
+  deskripsi_backlog?: string;
+  deskripsi?: string;
+  prioritas?: string;
+  status: string; // OPEN, CLOSED, WAITING PART, IN PROGRESS
+  rencana_eksekusi?: string;
+  rencana?: string;
   part_required?: string;
-  estimated_hours?: number;
+  estimated_hours?: number | string;
   est_hours?: number | string;
 }
 

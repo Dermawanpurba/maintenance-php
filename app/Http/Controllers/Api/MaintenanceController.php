@@ -329,7 +329,21 @@ class MaintenanceController extends Controller
             'pelaporList' => $this->mapRecords(MasterPelapor::all()),
             'activities' => $this->mapRecords(MechanicActivity::all()),
             'wo' => $this->mapRecords(WorkOrder::all()),
-            'backlog' => $this->mapRecords(Backlog::all()),
+            'backlog' => Backlog::all()->map(function($b) {
+                $arr = $b->toArray();
+                $arr['id'] = $arr['item_id'] ?? $arr['id'];
+                $arr['equip_no'] = $arr['equip_no'] ?? ($arr['no_unit'] ?? '');
+                $arr['no_unit'] = $arr['equip_no'];
+                $arr['deskripsi_backlog'] = $arr['deskripsi_backlog'] ?? ($arr['deskripsi'] ?? '');
+                $arr['deskripsi'] = $arr['deskripsi_backlog'];
+                $arr['rencana_eksekusi'] = $arr['rencana_eksekusi'] ?? ($arr['rencana'] ?? ($arr['part_required'] ?? ''));
+                $arr['rencana'] = $arr['rencana_eksekusi'];
+                $arr['part_required'] = $arr['rencana_eksekusi'];
+                $arr['est_hours'] = $arr['est_hours'] ?? ($arr['estimated_hours'] ?? 4);
+                $arr['estimated_hours'] = $arr['est_hours'];
+                $arr['status'] = strtoupper($arr['status'] ?? 'OPEN');
+                return $arr;
+            })->values()->all(),
             'serviceHistory' => $this->mapRecords(ServiceHistory::all()),
             'inspections' => $this->mapRecords(Inspection::all()),
             'pcr' => $this->mapRecords(PcrComponent::all()),
@@ -555,14 +569,20 @@ class MaintenanceController extends Controller
     public function saveBacklog($data)
     {
         $id = $data['id'] ?? $data['item_id'] ?? ('BL-' . time());
+        $equipNo = $data['equip_no'] ?? ($data['no_unit'] ?? '');
+        $desc = $data['deskripsi_backlog'] ?? ($data['deskripsi'] ?? '');
+        $rencana = $data['rencana_eksekusi'] ?? ($data['rencana'] ?? ($data['part_required'] ?? ''));
+        $estHours = $data['est_hours'] ?? ($data['estimated_hours'] ?? 4);
+        $status = strtoupper($data['status'] ?? 'OPEN');
+
         $fields = [
             'item_id' => $id,
             'tanggal' => $data['tanggal'] ?? date('Y-m-d'),
-            'equip_no' => $data['equip_no'] ?? '',
-            'deskripsi_backlog' => $data['deskripsi_backlog'] ?? '',
-            'status' => $data['status'] ?? 'Open',
-            'rencana_eksekusi' => $data['rencana_eksekusi'] ?? '',
-            'est_hours' => $data['est_hours'] ?? 0
+            'equip_no' => strtoupper($equipNo),
+            'deskripsi_backlog' => $desc,
+            'status' => $status,
+            'rencana_eksekusi' => $rencana,
+            'est_hours' => $estHours
         ];
 
         Backlog::updateOrCreate(['item_id' => $id], $fields);
