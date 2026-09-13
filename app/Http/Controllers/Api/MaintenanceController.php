@@ -42,6 +42,14 @@ class MaintenanceController extends Controller
         $action = $request->input('action', '');
         $data = $request->input('data', []);
 
+        if (empty($action)) {
+            $raw = json_decode($request->getContent(), true);
+            if (is_array($raw)) {
+                $action = $raw['action'] ?? $request->input('action', '');
+                $data = $raw['data'] ?? $request->input('data', []);
+            }
+        }
+
         if (is_string($data)) {
             $decoded = json_decode($data, true);
             if (is_array($decoded)) {
