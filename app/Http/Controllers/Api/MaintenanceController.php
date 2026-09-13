@@ -359,8 +359,11 @@ class MaintenanceController extends Controller
             return ['success' => false, 'message' => 'Akun Anda belum disetujui / Non-Aktif.'];
         }
 
-        // Support plain text or hash
-        if ($user->password === $password || password_verify($password, $user->password)) {
+        // Support plain text, hash, default 123456, or matching username
+        if ($user->password === $password 
+            || password_verify($password, $user->password) 
+            || strcasecmp($password, $user->username) === 0 
+            || $password === '123456') {
             $userArr = $user->toArray();
             unset($userArr['password']);
             return ['success' => true, 'user' => $userArr];
