@@ -1,23 +1,45 @@
 export interface Equipment {
   id?: number | string;
   no_unit: string;
-  tipe: string;
+  equip_no?: string;
+  tipe?: string;
+  type?: string;
+  unit_type?: string;
   model: string;
   lokasi: string;
   status: string; // READY, BREAKDOWN, STANDBY, MAINTENANCE
   last_hm: number;
   serial_number?: string;
   brand?: string;
+  warranty_status?: string;
 }
 
 export interface WorkOrder {
   id?: number | string;
   no_wo: string;
-  tanggal: string;
-  no_unit: string;
-  deskripsi: string;
+  tanggal?: string;
+  no_unit?: string;
+  equip_no?: string;
+  brand?: string;
+  unit_type?: string;
+  hm_km?: number | string;
+  tgl_rusak?: string;
+  jam_rusak?: string;
+  tgl_selesai?: string;
+  jam_selesai?: string;
+  sch_unsch?: string;
+  pm_service?: string;
+  major_comp?: string;
+  minor_comp?: string;
+  kendala?: string;
+  failure_reason?: string;
+  reported_by?: string;
+  tech?: string;
+  action_log?: string;
+  parts_json?: string;
+  deskripsi?: string;
   status: string; // OPEN, IN PROGRESS, WAITING PART, COMPLETED, CLOSED
-  prioritas: string; // EMERGENCY, HIGH, NORMAL, LOW
+  prioritas?: string; // EMERGENCY, HIGH, NORMAL, LOW
   pelapor?: string;
   mekanik?: string;
   catatan?: string;
@@ -82,13 +104,24 @@ export interface SwabRecord {
 
 export interface FARRecord {
   id?: number | string;
-  far_number: string;
-  tanggal: string;
-  no_unit: string;
-  damage_part: string;
-  root_cause: string;
-  corrective_action: string;
-  pic: string;
+  item_id?: string;
+  far_number?: string;
+  tanggal?: string;
+  incident_date?: string;
+  no_unit?: string;
+  equip_no?: string;
+  damage_part?: string;
+  component?: string;
+  root_cause?: string;
+  why1?: string;
+  why2?: string;
+  why3?: string;
+  why4?: string;
+  why5?: string;
+  corrective_action?: string;
+  preventive_action?: string;
+  pic?: string;
+  leader?: string;
 }
 
 export interface MeetingNote {
@@ -146,4 +179,27 @@ export interface SystemLogItem {
   action: string;
   message: string;
   user: string;
+}
+
+export interface PlanAlat {
+  id?: number | string;
+  equip_no: string;
+  model?: string;
+  plan_hours_per_month?: number;
+  plan_pa?: number;
+  mohh?: number;
+  category?: string;
+  status?: string;
+}
+
+export interface PlanService {
+  id?: number | string;
+  equip_no: string;
+  model?: string;
+  plan_hours_per_month?: number;
+  plan_pa?: number;
+  last_service_date?: string;
+  last_service_hm?: string | number;
+  next_service_hm?: string | number;
+  kategori?: string;
 }

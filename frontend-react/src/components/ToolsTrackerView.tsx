@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Hammer, Search, Plus, CheckCircle2, Clock, X } from 'lucide-react';
+import { Hammer, Search, Plus, CheckCircle2, Clock, X, Trash2 } from 'lucide-react';
 import { ToolItem } from '../types';
 import { api } from '../services/api';
 
@@ -50,6 +50,20 @@ export const ToolsTrackerView: React.FC<ToolsTrackerViewProps> = ({ tools, onRef
         onRefresh();
       } else {
         alert(res.message || 'Gagal memperbarui status alat');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handleDelete = async (toolId: any) => {
+    if (!window.confirm('Yakin ingin menghapus perkakas ini?')) return;
+    try {
+      const res = await api.deleteMasterTool(toolId);
+      if (res.success) {
+        onRefresh();
+      } else {
+        alert(res.message || 'Gagal menghapus alat');
       }
     } catch (err: any) {
       alert('Error: ' + err.message);
@@ -162,17 +176,27 @@ export const ToolsTrackerView: React.FC<ToolsTrackerViewProps> = ({ tools, onRef
                         {t.borrow_date || '-'}
                       </td>
                       <td className="py-3.5 px-4">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleBorrow(t)}
-                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer ${
-                            isBorrowed
-                              ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-                              : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200'
-                          }`}
-                        >
-                          {isBorrowed ? 'Kembalikan Alat' : 'Pinjam Alat'}
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleBorrow(t)}
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer ${
+                              isBorrowed
+                                ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                                : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200'
+                            }`}
+                          >
+                            {isBorrowed ? 'Kembalikan' : 'Pinjam'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(t.id || t.tool_id)}
+                            title="Hapus Perkakas"
+                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

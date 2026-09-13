@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Repeat, Plus, Search, CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { Repeat, Plus, Search, CheckCircle2, AlertTriangle, X, Trash2 } from 'lucide-react';
 import { SwabRecord, Equipment } from '../types';
 import { api } from '../services/api';
 
@@ -103,12 +103,13 @@ export const SwabView: React.FC<SwabViewProps> = ({ swabs, equipments, onRefresh
                 <th className="py-3 px-4">Alasan Kanibalisasi</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4">Otorisasi / PIC</th>
+                <th className="py-3 px-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-slate-400">
+                  <td colSpan={8} className="text-center py-10 text-slate-400">
                     Tidak ada catatan pemindahan atau kanibalisasi komponen.
                   </td>
                 </tr>
@@ -134,17 +135,48 @@ export const SwabView: React.FC<SwabViewProps> = ({ swabs, equipments, onRefresh
                         {s.reason || '-'}
                       </td>
                       <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const newStatus = isActive ? 'Restored' : 'Active';
+                            try {
+                              const res = await api.updateSwabStatus(s.id || '', newStatus);
+                              if (res.success) onRefresh();
+                              else alert(res.message || 'Gagal mengubah status');
+                            } catch (err: any) {
+                              alert('Error: ' + err.message);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider cursor-pointer hover:opacity-80 transition-opacity ${
                             isActive
                               ? 'bg-red-100 text-red-700 border border-red-300'
                               : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                           }`}
+                          title="Klik untuk ubah status swab"
                         >
                           {isActive ? 'Aktif Terpasang' : 'Sudah Dikembalikan'}
-                        </span>
+                        </button>
                       </td>
                       <td className="py-3.5 px-4 text-slate-600 font-semibold">{s.pic || '-'}</td>
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!window.confirm(`Hapus catatan swab komponen "${s.component_name}"?`)) return;
+                            try {
+                              const res = await api.deleteSwabComponent(s.id || '');
+                              if (res.success) onRefresh();
+                              else alert(res.message || 'Gagal menghapus catatan');
+                            } catch (err: any) {
+                              alert('Error: ' + err.message);
+                            }
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Hapus Catatan Swab"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })

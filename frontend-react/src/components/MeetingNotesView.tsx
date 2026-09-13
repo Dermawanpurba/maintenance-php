@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Plus, Search, Calendar, Users, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FileText, Plus, Search, Calendar, Users, X, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { MeetingNote } from '../types';
 import { api } from '../services/api';
 
@@ -78,6 +78,20 @@ export const MeetingNotesView: React.FC<MeetingNotesViewProps> = ({ notes, onRef
       alert('Error: ' + err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: any) => {
+    if (!window.confirm('Yakin ingin menghapus notulen rapat ini?')) return;
+    try {
+      const res = await api.deleteMeetingNotes(id);
+      if (res.success) {
+        onRefresh();
+      } else {
+        alert(res.message || 'Gagal menghapus notulen');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
     }
   };
 
@@ -173,13 +187,22 @@ export const MeetingNotesView: React.FC<MeetingNotesViewProps> = ({ notes, onRef
 
                 {/* Card Footer */}
                 <div className="flex items-center justify-between text-[11px] text-slate-500 pt-3 border-t border-slate-100">
-                  <span className="flex items-center space-x-1.5 truncate max-w-[240px]" title={note.attendees}>
+                  <span className="flex items-center space-x-1.5 truncate max-w-[200px]" title={note.attendees}>
                     <Users className="w-3.5 h-3.5 text-slate-400" />
                     <span className="truncate font-medium">{note.attendees || 'Tim Plant'}</span>
                   </span>
-                  <span className="font-extrabold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg">
-                    PIC: {leader}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-extrabold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      PIC: {leader}
+                    </span>
+                    <button
+                      onClick={() => handleDelete(note.id)}
+                      title="Hapus Notulen"
+                      className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

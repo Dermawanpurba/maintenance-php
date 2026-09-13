@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Clock, Plus, Search, Gauge, Fuel, X } from 'lucide-react';
+import { Clock, Plus, Search, Gauge, Fuel, X, Trash2 } from 'lucide-react';
 import { DailyHM, Equipment } from '../types';
 import { api } from '../services/api';
 
@@ -86,6 +86,20 @@ export const DailyHmView: React.FC<DailyHmViewProps> = ({
     }
   };
 
+  const handleDelete = async (id: any) => {
+    if (!window.confirm('Yakin ingin menghapus catatan Hour Meter ini?')) return;
+    try {
+      const res = await api.deleteDailyHM(id);
+      if (res.success) {
+        onRefresh();
+      } else {
+        alert(res.message || 'Gagal menghapus data HM');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Top Filter & Action Bar Card */}
@@ -107,7 +121,7 @@ export const DailyHmView: React.FC<DailyHmViewProps> = ({
           className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black shadow-sm shadow-purple-500/30 transition-all hover:shadow-md active:scale-95 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>Input Log Daily HM &amp; BBM</span>
+          <span>Input Log Hour Meter (HM)</span>
         </button>
       </div>
 
@@ -125,12 +139,13 @@ export const DailyHmView: React.FC<DailyHmViewProps> = ({
                 <th className="py-3 px-4">Total HM Operasi</th>
                 <th className="py-3 px-4">BBM (Liter)</th>
                 <th className="py-3 px-4">Operator / Driver</th>
+                <th className="py-3 px-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-10 text-slate-400">
+                  <td colSpan={9} className="text-center py-10 text-slate-400">
                     Tidak ada catatan Hour Meter yang tercatat.
                   </td>
                 </tr>
@@ -153,6 +168,15 @@ export const DailyHmView: React.FC<DailyHmViewProps> = ({
                       {hm.fuel_liter || 0} L
                     </td>
                     <td className="py-3 px-4 text-slate-600">{hm.operator || '-'}</td>
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => handleDelete(hm.id)}
+                        title="Hapus Catatan HM"
+                        className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors inline-flex"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

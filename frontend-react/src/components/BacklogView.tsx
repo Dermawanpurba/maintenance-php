@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Plus, Search, CheckCircle2, Clock, X, Wrench } from 'lucide-react';
+import { AlertTriangle, Plus, Search, CheckCircle2, Clock, X, Wrench, Trash2 } from 'lucide-react';
 import { Backlog, Equipment } from '../types';
 import { api } from '../services/api';
 
@@ -41,14 +41,25 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
 
   const handleStatusChange = async (id: any, newStatus: string) => {
     try {
-      const res = await api.postAction('updateBacklogStatus', {
-        id,
-        status: newStatus
-      });
+      const res = await api.updateBacklogStatus(id, newStatus);
       if (res.success) {
         onRefresh();
       } else {
         alert(res.message || 'Gagal mengubah status backlog');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handleDelete = async (id: any) => {
+    if (!window.confirm('Yakin ingin menghapus temuan backlog ini?')) return;
+    try {
+      const res = await api.deleteBacklog(id);
+      if (res.success) {
+        onRefresh();
+      } else {
+        alert(res.message || 'Gagal menghapus backlog');
       }
     } catch (err: any) {
       alert('Error: ' + err.message);
@@ -137,12 +148,13 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
                 <th className="py-3 px-4">Prioritas</th>
                 <th className="py-3 px-4">Est. Jam</th>
                 <th className="py-3 px-4">Status &amp; Ubah</th>
+                <th className="py-3 px-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-10 text-slate-400">
+                  <td colSpan={7} className="text-center py-10 text-slate-400">
                     Tidak ada temuan backlog defect yang tercatat.
                   </td>
                 </tr>
@@ -196,6 +208,15 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
                           <option value="SCHEDULED">SCHEDULED</option>
                           <option value="COMPLETED">COMPLETED</option>
                         </select>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => handleDelete(bl.id)}
+                          title="Hapus Defect"
+                          className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors inline-flex"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </td>
                     </tr>
                   );

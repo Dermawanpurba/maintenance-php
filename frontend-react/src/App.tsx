@@ -29,7 +29,10 @@ import {
   FARRecord,
   MeetingNote,
   MonthlyBudgetItem,
-  PcrItem
+  PcrItem,
+  PlanAlat,
+  PlanService,
+  SystemLogItem
 } from './types';
 import { RefreshCw } from 'lucide-react';
 
@@ -53,6 +56,9 @@ export const App: React.FC = () => {
   const [meetingNotes, setMeetingNotes] = useState<MeetingNote[]>([]);
   const [monthlyBudgets, setMonthlyBudgets] = useState<MonthlyBudgetItem[]>([]);
   const [pcrList, setPcrList] = useState<PcrItem[]>([]);
+  const [planAlats, setPlanAlats] = useState<PlanAlat[]>([]);
+  const [planServices, setPlanServices] = useState<PlanService[]>([]);
+  const [systemLogs, setSystemLogs] = useState<SystemLogItem[]>([]);
 
   const loadData = async () => {
     const startTime = performance.now();
@@ -75,6 +81,9 @@ export const App: React.FC = () => {
         setMeetingNotes(data.meetingNotes || []);
         setMonthlyBudgets(data.monthlyBudget || []);
         setPcrList(data.pcr || []);
+        setPlanAlats(data.planAlat || []);
+        setPlanServices(data.planService || []);
+        setSystemLogs(data.systemLogs || []);
       }
     } catch (err) {
       console.error('Failed to fetch data from API:', err);
@@ -159,7 +168,12 @@ export const App: React.FC = () => {
                   />
                 )}
                 {currentTab === 'fleet' && (
-                  <EquipmentView equipments={equipments} onRefresh={loadData} />
+                  <EquipmentView
+                    equipments={equipments}
+                    planAlats={planAlats}
+                    planServices={planServices}
+                    onRefresh={loadData}
+                  />
                 )}
                 {currentTab === 'wo' && (
                   <WorkOrdersView
@@ -211,6 +225,7 @@ export const App: React.FC = () => {
                   <SystemHealthView
                     latency={latency}
                     apiOnline={apiOnline}
+                    systemLogs={systemLogs}
                     onRefresh={loadData}
                   />
                 )}

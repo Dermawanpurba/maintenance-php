@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
-import { Wrench, Plus, Search, Filter, Clock, CheckCircle2, AlertCircle, X, ShieldAlert } from 'lucide-react';
-import { WorkOrder, Equipment } from '../types';
+import { Wrench, Plus, Search, Printer, Trash2, Edit3, X, AlertTriangle, ShieldAlert, CheckCircle2, ChevronDown } from 'lucide-react';
+import { WorkOrder, Equipment, PartItem } from '../types';
 import { api } from '../services/api';
+import { printWorkOrderSPK } from '../utils/printUtils';
 
 interface WorkOrdersViewProps {
   workOrders: WorkOrder[];
   equipments: Equipment[];
   onRefresh: () => void;
+}
+
+interface PartRow {
+  part_number: string;
+  part_name: string;
+  qty: number;
+  uom: string;
 }
 
 export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
@@ -17,41 +25,160 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
+  
+  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBDModalOpen, setIsBDModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
-  // Form state
-  const [form, setForm] = useState<Partial<WorkOrder>>({
+  // Quick Breakdown Awal Form State
+  const [bdForm, setBdForm] = useState({
+    equip_no: equipments[0]?.equip_no || equipments[0]?.no_unit || '',
+    kendala: '',
+    pelapor: 'Operator Pit',
+    shift: '1'
+  });
+
+  // Comprehensive WO Form State
+  const [form, setForm] = useState<{
+    no_wo: string;
+    equip_no: string;
+    brand: string;
+    unit_type: string;
+    hm_km: number;
+    tgl_rusak: string;
+    jam_rusak: string;
+    tgl_selesai: string;
+    jam_selesai: string;
+    sch_unsch: string;
+    pm_service: string;
+    major_comp: string;
+    minor_comp: string;
+    kendala: string;
+    failure_reason: string;
+    status: string;
+    reported_by: string;
+    tech: string;
+    action_log: string;
+  }>({
     no_wo: `WO-${Date.now().toString().slice(-6)}`,
-    tanggal: new Date().toISOString().split('T')[0],
-    no_unit: equipments[0]?.no_unit || '',
-    deskripsi: '',
-    prioritas: 'NORMAL',
+    equip_no: equipments[0]?.equip_no || equipments[0]?.no_unit || '',
+    brand: equipments[0]?.brand || '',
+    unit_type: equipments[0]?.model || equipments[0]?.unit_type || '',
+    hm_km: Number(equipments[0]?.last_hm || 0),
+    tgl_rusak: new Date().toISOString().split('T')[0],
+    jam_rusak: new Date().toTimeString().slice(0, 5),
+    tgl_selesai: '',
+    jam_selesai: '',
+    sch_unsch: 'UNSCHEDULED',
+    pm_service: 'Corrective Maintenance',
+    major_comp: 'ENGINE',
+    minor_comp: '',
+    kendala: '',
+    failure_reason: '',
     status: 'OPEN',
-    pelapor: 'Planner Plant',
-    mekanik: 'Mekanik Shift',
-    catatan: '',
+    reported_by: 'Operator Pit',
+    tech: 'Mekanik Workshop',
+    action_log: ''
   });
 
-  const filtered = workOrders.filter(wo => {
-    const matchSearch =
-      (wo.no_wo || '').toLowerCase().includes(search.toLowerCase()) ||
-      (wo.no_unit || '').toLowerCase().includes(search.toLowerCase()) ||
-      (wo.deskripsi || '').toLowerCase().includes(search.toLowerCase()) ||
-      (wo.pelapor || '').toLowerCase().includes(search.toLowerCase());
+  // Dynamic Part Usage Rows
+  const [partRows, setPartRows] = useState<PartRow[]>([]);
 
-    const matchStatus = statusFilter === 'ALL' || (wo.status || '').toUpperCase() === statusFilter.toUpperCase();
-    const matchPriority = priorityFilter === 'ALL' || (wo.prioritas || '').toUpperCase() === priorityFilter.toUpperCase();
+  // When equip_no changes, auto fill brand, unit_type, hm_km
+  const handleEquipChange = (eqNo: string) => {
+    const eq = equipments.find(e => (e.equip_no || e.no_unit) === eqNo);
+    setForm(prev => ({
+      ...prev,
+      equip_no: eqNo,
+      brand: eq?.brand || prev.brand,
+      unit_type: eq?.model || eq?.unit_type || prev.unit_type,
+      hm_km: Number(eq?.last_hm || prev.hm_km)
+    }));
+  };
 
-    return matchSearch && matchStatus && matchPriority;
-  });
+  const handleOpenCreateModal = () => {
+    setIsEditMode(false);
+    const initialEq = equipments[0];
+    setForm({
+      no_wo: `WO-${Date.now().toString().slice(-6)}`,
+      equip_no: initialEq?.equip_no || initialEq?.no_unit || '',
+      brand: initialEq?.brand || '',
+      unit_type: initialEq?.model || initialEq?.unit_type || '',
+      hm_km: Number(initialEq?.last_hm || 0),
+      tgl_rusak: new Date().toISOString().split('T')[0],
+      jam_rusak: new Date().toTimeString().slice(0, 5),
+      tgl_selesai: '',
+      jam_selesai: '',
+      sch_unsch: 'UNSCHEDULED',
+      pm_service: 'Corrective Maintenance',
+      major_comp: 'ENGINE',
+      minor_comp: '',
+      kendala: '',
+      failure_reason: '',
+      status: 'OPEN',
+      reported_by: 'Operator Pit',
+      tech: 'Mekanik Workshop',
+      action_log: ''
+    });
+    setPartRows([]);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (wo: WorkOrder) => {
+    setIsEditMode(true);
+    let parts: PartRow[] = [];
+    try {
+      if (typeof wo.parts_json === 'string') {
+        parts = JSON.parse(wo.parts_json || '[]');
+      } else if (Array.isArray(wo.parts_json)) {
+        parts = wo.parts_json;
+      }
+    } catch (e) {
+      parts = [];
+    }
+
+    setForm({
+      no_wo: wo.no_wo || '',
+      equip_no: wo.equip_no || wo.no_unit || '',
+      brand: wo.brand || '',
+      unit_type: wo.unit_type || '',
+      hm_km: Number(wo.hm_km || 0),
+      tgl_rusak: wo.tgl_rusak || wo.tanggal || new Date().toISOString().split('T')[0],
+      jam_rusak: wo.jam_rusak || '',
+      tgl_selesai: wo.tgl_selesai || '',
+      jam_selesai: wo.jam_selesai || '',
+      sch_unsch: wo.sch_unsch || 'UNSCHEDULED',
+      pm_service: wo.pm_service || 'Corrective Maintenance',
+      major_comp: wo.major_comp || 'ENGINE',
+      minor_comp: wo.minor_comp || '',
+      kendala: wo.kendala || wo.deskripsi || '',
+      failure_reason: wo.failure_reason || '',
+      status: wo.status || 'OPEN',
+      reported_by: wo.reported_by || wo.pelapor || '',
+      tech: wo.tech || wo.mekanik || '',
+      action_log: wo.action_log || ''
+    });
+    setPartRows(parts);
+    setIsModalOpen(true);
+  };
+
+  const handleAddPartRow = () => {
+    setPartRows(prev => [...prev, { part_number: '', part_name: '', qty: 1, uom: 'Pcs' }]);
+  };
+
+  const handleRemovePartRow = (index: number) => {
+    setPartRows(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePartRowChange = (index: number, field: keyof PartRow, value: any) => {
+    setPartRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));
+  };
 
   const handleStatusChange = async (no_wo: string, newStatus: string) => {
     try {
-      const res = await api.postAction('updateWOStatus', {
-        no_wo,
-        status: newStatus
-      });
+      const res = await api.updateWOStatus(no_wo, newStatus);
       if (res.success) {
         onRefresh();
       } else {
@@ -62,32 +189,39 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleDelete = async (no_wo: string) => {
+    if (!window.confirm(`Yakin ingin menghapus Work Order ${no_wo}?`)) return;
+    try {
+      const res = await api.deleteWO(no_wo);
+      if (res.success) {
+        onRefresh();
+      } else {
+        alert(res.message || 'Gagal menghapus WO');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handleSaveWO = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.no_unit || !form.deskripsi?.trim()) {
-      alert('Pilih unit dan isi deskripsi gangguan!');
+    if (!form.equip_no || !form.kendala?.trim()) {
+      alert('Harap pilih unit dan isi deskripsi kendala / masalah!');
       return;
     }
 
     try {
       setSubmitting(true);
-      const res = await api.postAction('saveWorkOrder', form);
+      const payload = {
+        ...form,
+        parts_json: partRows
+      };
+      const res = await api.saveWorkOrder(payload);
       if (res.success) {
         setIsModalOpen(false);
-        setForm({
-          no_wo: `WO-${Date.now().toString().slice(-6)}`,
-          tanggal: new Date().toISOString().split('T')[0],
-          no_unit: equipments[0]?.no_unit || '',
-          deskripsi: '',
-          prioritas: 'NORMAL',
-          status: 'OPEN',
-          pelapor: 'Planner Plant',
-          mekanik: 'Mekanik Shift',
-          catatan: '',
-        });
         onRefresh();
       } else {
-        alert(res.message || 'Gagal membuat Work Order');
+        alert(res.message || 'Gagal menyimpan Work Order');
       }
     } catch (err: any) {
       alert('Error: ' + err.message);
@@ -96,19 +230,65 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
     }
   };
 
+  const handleSaveBDAwal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bdForm.equip_no || !bdForm.kendala.trim()) {
+      alert('Harap pilih nomor lambung unit dan isi kendala breakdown!');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await api.saveBDAwal(bdForm);
+      if (res.success) {
+        setIsBDModalOpen(false);
+        setBdForm({
+          equip_no: equipments[0]?.equip_no || equipments[0]?.no_unit || '',
+          kendala: '',
+          pelapor: 'Operator Pit',
+          shift: '1'
+        });
+        onRefresh();
+      } else {
+        alert(res.message || 'Gagal membuat laporan breakdown');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const filtered = workOrders.filter(wo => {
+    const eq = wo.equip_no || wo.no_unit || '';
+    const desc = wo.kendala || wo.deskripsi || '';
+    const rep = wo.reported_by || wo.pelapor || '';
+    const matchSearch =
+      (wo.no_wo || '').toLowerCase().includes(search.toLowerCase()) ||
+      eq.toLowerCase().includes(search.toLowerCase()) ||
+      desc.toLowerCase().includes(search.toLowerCase()) ||
+      rep.toLowerCase().includes(search.toLowerCase());
+
+    const s = (wo.status || 'OPEN').toUpperCase();
+    const matchStatus = statusFilter === 'ALL' || s === statusFilter.toUpperCase();
+    const matchPriority = priorityFilter === 'ALL' || (wo.sch_unsch || '').toUpperCase().includes(priorityFilter.toUpperCase());
+
+    return matchSearch && matchStatus && matchPriority;
+  });
+
   return (
     <div className="space-y-6 pb-12">
       {/* Top Filter & Action Bar Card */}
-      <div className="bg-white border border-slate-200/80 p-4 md:p-5 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/80 p-4 md:p-6 rounded-3xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Cari nomor WO / unit / deskripsi..."
-              className="pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:bg-white text-slate-800 placeholder-slate-400 w-56 sm:w-72 font-medium transition-all"
+              placeholder="Cari nomor WO / no lambung / kendala..."
+              className="pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200/80 rounded-xl outline-none focus:border-blue-500 focus:bg-white text-slate-800 placeholder-slate-400 w-56 sm:w-72 font-medium transition-all"
             />
           </div>
 
@@ -116,37 +296,48 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 text-slate-700 font-bold transition-all"
+            className="py-2 px-3 text-xs bg-slate-50 border border-slate-200/80 rounded-xl outline-none focus:border-blue-500 text-slate-700 font-bold transition-all"
           >
             <option value="ALL">Semua Status</option>
             <option value="OPEN">OPEN</option>
             <option value="IN PROGRESS">IN PROGRESS</option>
             <option value="WAITING PART">WAITING PART</option>
             <option value="CLOSED">CLOSED</option>
+            <option value="BREAKDOWN">BREAKDOWN</option>
           </select>
 
-          {/* Priority Filter */}
+          {/* Priority / Class Filter */}
           <select
             value={priorityFilter}
             onChange={e => setPriorityFilter(e.target.value)}
-            className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 text-slate-700 font-bold transition-all hidden sm:block"
+            className="py-2 px-3 text-xs bg-slate-50 border border-slate-200/80 rounded-xl outline-none focus:border-blue-500 text-slate-700 font-bold transition-all hidden sm:block"
           >
-            <option value="ALL">Semua Prioritas</option>
-            <option value="EMERGENCY">EMERGENCY</option>
-            <option value="HIGH">HIGH</option>
-            <option value="NORMAL">NORMAL</option>
-            <option value="LOW">LOW</option>
+            <option value="ALL">Semua Jadwal</option>
+            <option value="SCHEDULED">SCHEDULED</option>
+            <option value="UNSCHEDULED">UNSCHEDULED</option>
           </select>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-sm shadow-blue-500/30 transition-all hover:shadow-md active:scale-95 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Buat Work Order (WO)</span>
-        </button>
+        {/* Action Buttons: Quick BD + Buat WO */}
+        <div className="flex items-center space-x-2.5">
+          <button
+            type="button"
+            onClick={() => setIsBDModalOpen(true)}
+            className="flex items-center justify-center space-x-2 px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+          >
+            <ShieldAlert className="w-4 h-4 text-red-600" />
+            <span>+ Quick B/D Awal</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleOpenCreateModal}
+            className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Buat Work Order (WO)</span>
+          </button>
+        </div>
       </div>
 
       {/* WO Table Card */}
@@ -156,61 +347,63 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
             <thead>
               <tr className="bg-slate-100/80 text-slate-500 font-black uppercase text-[10px] tracking-wider border-b border-slate-200/80">
                 <th className="py-3 px-4">No. WO</th>
-                <th className="py-3 px-4">Tanggal</th>
-                <th className="py-3 px-4">Unit</th>
-                <th className="py-3 px-4">Deskripsi Gangguan / Perbaikan</th>
-                <th className="py-3 px-4">Prioritas</th>
-                <th className="py-3 px-4">Status &amp; Ubah</th>
-                <th className="py-3 px-4">Pelapor / PIC</th>
+                <th className="py-3 px-4">Tanggal Rusak</th>
+                <th className="py-3 px-4">Unit Alat</th>
+                <th className="py-3 px-4">Layanan / Kendala</th>
+                <th className="py-3 px-4">Komponen</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">PIC Mekanik</th>
+                <th className="py-3 px-4 text-center">Aksi &amp; Dokumen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-slate-400">
+                  <td colSpan={8} className="text-center py-12 text-slate-400">
                     Tidak ada Work Order yang cocok dengan kriteria pencarian.
                   </td>
                 </tr>
               ) : (
                 filtered.map((wo, idx) => {
                   const s = (wo.status || 'OPEN').toUpperCase();
-                  const p = (wo.prioritas || 'NORMAL').toUpperCase();
                   const isClosed = s === 'CLOSED' || s === 'COMPLETED';
+                  const isBreakdown = s === 'BREAKDOWN';
+                  const eqNo = wo.equip_no || wo.no_unit || '-';
+                  const desc = wo.kendala || wo.deskripsi || '-';
+                  const date = wo.tgl_rusak || wo.tanggal || '-';
 
                   return (
                     <tr key={wo.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3 px-4 font-mono font-bold text-blue-600">
+                      <td className="py-3.5 px-4 font-mono font-bold text-blue-600">
                         {wo.no_wo}
                       </td>
-                      <td className="py-3 px-4 text-slate-500">{wo.tanggal}</td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-black text-[10px]">
-                          {wo.no_unit}
+                      <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                        {date} {wo.jam_rusak ? `(${wo.jam_rusak})` : ''}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-black text-[11px]">
+                          {eqNo}
+                        </span>
+                        {wo.brand && <span className="block text-[10px] text-slate-400 mt-0.5">{wo.brand} {wo.unit_type}</span>}
+                      </td>
+                      <td className="py-3.5 px-4 max-w-xs truncate" title={desc}>
+                        <span className="font-semibold text-slate-800 block truncate">{desc}</span>
+                        <span className="text-[10px] text-slate-400">{wo.pm_service || 'Corrective'}</span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold">
+                          {wo.major_comp || 'GENERAL'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-slate-800 max-w-sm truncate" title={wo.deskripsi}>
-                        {wo.deskripsi}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
-                            p === 'EMERGENCY' || p === 'HIGH'
-                              ? 'bg-red-100 text-red-700'
-                              : p === 'NORMAL'
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {p}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <select
                           value={s}
                           onChange={e => handleStatusChange(wo.no_wo, e.target.value)}
-                          className={`py-1 px-2.5 rounded-lg text-[10px] font-black border transition-colors outline-none cursor-pointer ${
+                          className={`py-1 px-2 rounded-lg text-[10px] font-bold border outline-none cursor-pointer ${
                             isClosed
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : isBreakdown
+                              ? 'bg-red-50 text-red-700 border-red-300'
                               : s.includes('WAIT')
                               ? 'bg-amber-50 text-amber-700 border-amber-300'
                               : 'bg-blue-50 text-blue-700 border-blue-300'
@@ -219,12 +412,42 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                           <option value="OPEN">OPEN</option>
                           <option value="IN PROGRESS">IN PROGRESS</option>
                           <option value="WAITING PART">WAITING PART</option>
-                          <option value="COMPLETED">COMPLETED</option>
+                          <option value="BREAKDOWN">BREAKDOWN</option>
                           <option value="CLOSED">CLOSED</option>
                         </select>
                       </td>
-                      <td className="py-3 px-4 text-slate-500 font-semibold">
-                        {wo.pelapor || '-'}
+                      <td className="py-3.5 px-4 text-slate-600">
+                        {wo.tech || wo.mekanik || '-'}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center justify-center space-x-1.5">
+                          {/* Print SPK */}
+                          <button
+                            onClick={() => printWorkOrderSPK(wo)}
+                            title="Cetak SPK / Surat Perintah Kerja"
+                            className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Edit WO */}
+                          <button
+                            onClick={() => handleOpenEditModal(wo)}
+                            title="Edit Work Order"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Delete WO */}
+                          <button
+                            onClick={() => handleDelete(wo.no_wo)}
+                            title="Hapus Work Order"
+                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -235,119 +458,330 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
         </div>
       </div>
 
-      {/* Modal Dialog Buat WO Baru */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 w-full max-w-lg shadow-2xl relative">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                  <Wrench className="w-4 h-4" />
-                </div>
-                <h3 className="text-base font-black text-slate-900 tracking-tight">
-                  Buat Surat Perintah Kerja (WO)
-                </h3>
+      {/* Modal Quick Breakdown Awal */}
+      {isBDModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2 text-red-600 font-bold text-sm">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <span>Pelaporan Cepat Breakdown Awal</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
+              <button onClick={() => setIsBDModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4 mt-4 text-xs font-semibold">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-600 mb-1">Nomor WO (Auto)</label>
-                  <input
-                    type="text"
-                    value={form.no_wo || ''}
-                    readOnly
-                    className="w-full px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-600 mb-1">Tanggal WO</label>
-                  <input
-                    type="date"
-                    value={form.tanggal || ''}
-                    onChange={e => setForm({ ...form, tanggal: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
+            <form onSubmit={handleSaveBDAwal} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-slate-600 mb-1">Pilih Unit Armada</label>
+                <label className="block text-slate-600 font-bold mb-1">Nomor Lambung Unit Breakdown *</label>
                 <select
-                  value={form.no_unit || ''}
-                  onChange={e => setForm({ ...form, no_unit: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-blue-500 font-bold"
+                  value={bdForm.equip_no}
+                  onChange={e => setBdForm({ ...bdForm, equip_no: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-red-500"
+                  required
                 >
                   {equipments.map(eq => (
-                    <option key={eq.id} value={eq.no_unit}>
-                      {eq.no_unit} - {eq.model} ({eq.status})
+                    <option key={eq.id || eq.equip_no} value={eq.equip_no || eq.no_unit}>
+                      {eq.equip_no || eq.no_unit} - {eq.model || eq.type} ({eq.status})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-600 mb-1">Deskripsi Gangguan / Pekerjaan</label>
+                <label className="block text-slate-600 font-bold mb-1">Kendala / Kerusakan di Lokasi *</label>
                 <textarea
                   rows={3}
-                  value={form.deskripsi || ''}
-                  onChange={e => setForm({ ...form, deskripsi: e.target.value })}
-                  placeholder="Jelaskan indikasi kerusakan atau rencana servis..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 font-medium"
+                  value={bdForm.kendala}
+                  onChange={e => setBdForm({ ...bdForm, kendala: e.target.value })}
+                  placeholder="Contoh: Hose hidrolik boom pecah, radiator overheat..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-red-500 resize-none"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-600 mb-1">Prioritas</label>
-                  <select
-                    value={form.prioritas || 'NORMAL'}
-                    onChange={e => setForm({ ...form, prioritas: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-blue-500 font-bold"
-                  >
-                    <option value="NORMAL">NORMAL</option>
-                    <option value="HIGH">HIGH</option>
-                    <option value="EMERGENCY">EMERGENCY</option>
-                    <option value="LOW">LOW</option>
-                  </select>
+                  <label className="block text-slate-600 font-bold mb-1">Pelapor</label>
+                  <input
+                    type="text"
+                    value={bdForm.pelapor}
+                    onChange={e => setBdForm({ ...bdForm, pelapor: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-red-500"
+                  />
                 </div>
                 <div>
-                  <label className="block text-slate-600 mb-1">Status Awal</label>
+                  <label className="block text-slate-600 font-bold mb-1">Shift</label>
                   <select
-                    value={form.status || 'OPEN'}
-                    onChange={e => setForm({ ...form, status: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-blue-500 font-bold"
+                    value={bdForm.shift}
+                    onChange={e => setBdForm({ ...bdForm, shift: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-red-500"
                   >
-                    <option value="OPEN">OPEN</option>
-                    <option value="IN PROGRESS">IN PROGRESS</option>
-                    <option value="WAITING PART">WAITING PART</option>
+                    <option value="1">Shift 1 (Siang)</option>
+                    <option value="2">Shift 2 (Malam)</option>
                   </select>
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+              <div className="p-3 bg-red-50 border border-red-200/80 rounded-xl text-[11px] text-red-700 leading-relaxed">
+                Unit akan langsung ditandai berstatus <strong>B/D (Breakdown)</strong> pada sistem, dan nomor tiket Work Order darurat akan dibuat otomatis.
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+                  onClick={() => setIsBDModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-md shadow-blue-500/20 active:scale-95 disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold shadow-md shadow-red-600/20"
                 >
-                  {submitting ? 'Menyimpan...' : 'Simpan Work Order'}
+                  {submitting ? 'Menyimpan...' : 'Kunci Breakdown Unit'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Dialog Buat / Edit WO Lengkap */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 w-full max-w-3xl shadow-2xl space-y-5 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">
+                    {isEditMode ? `Edit Work Order: ${form.no_wo}` : 'Buat Surat Perintah Kerja (WO) Baru'}
+                  </h3>
+                  <p className="text-xs text-slate-400">Pencatatan perbaikan unit, pemakaian part, dan delegasi teknisi</p>
+                </div>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveWO} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Nomor WO *</label>
+                  <input
+                    type="text"
+                    value={form.no_wo}
+                    onChange={e => setForm({ ...form, no_wo: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-blue-600 outline-none focus:border-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Pilih No. Lambung Unit *</label>
+                  <select
+                    value={form.equip_no}
+                    onChange={e => handleEquipChange(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-blue-500"
+                    required
+                  >
+                    {equipments.map(eq => (
+                      <option key={eq.id || eq.equip_no} value={eq.equip_no || eq.no_unit}>
+                        {eq.equip_no || eq.no_unit} - {eq.model || eq.type} ({eq.status})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Hour Meter (HM / KM)</label>
+                  <input
+                    type="number"
+                    value={form.hm_km}
+                    onChange={e => setForm({ ...form, hm_km: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Tanggal Rusak</label>
+                  <input
+                    type="date"
+                    value={form.tgl_rusak}
+                    onChange={e => setForm({ ...form, tgl_rusak: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Jam Rusak</label>
+                  <input
+                    type="time"
+                    value={form.jam_rusak}
+                    onChange={e => setForm({ ...form, jam_rusak: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Klasifikasi Servis</label>
+                  <select
+                    value={form.sch_unsch}
+                    onChange={e => setForm({ ...form, sch_unsch: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-blue-500"
+                  >
+                    <option value="UNSCHEDULED">UNSCHEDULED (Breakdown)</option>
+                    <option value="SCHEDULED">SCHEDULED (Preventive)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Status Work Order</label>
+                  <select
+                    value={form.status}
+                    onChange={e => setForm({ ...form, status: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-700 outline-none focus:border-blue-500"
+                  >
+                    <option value="OPEN">OPEN</option>
+                    <option value="IN PROGRESS">IN PROGRESS</option>
+                    <option value="WAITING PART">WAITING PART</option>
+                    <option value="BREAKDOWN">BREAKDOWN</option>
+                    <option value="CLOSED">CLOSED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Deskripsi Kendala &amp; Gejala Kerusakan *</label>
+                <textarea
+                  rows={2}
+                  value={form.kendala}
+                  onChange={e => setForm({ ...form, kendala: e.target.value })}
+                  placeholder="Deskripsikan secara detail gejala kerusakan atau pekerjaan yang dibutuhkan..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-blue-500 resize-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Major Component</label>
+                  <select
+                    value={form.major_comp}
+                    onChange={e => setForm({ ...form, major_comp: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-blue-500"
+                  >
+                    <option value="ENGINE">ENGINE</option>
+                    <option value="TRANSMISSION">TRANSMISSION / DRIVE LINE</option>
+                    <option value="HYDRAULIC">HYDRAULIC SYSTEM</option>
+                    <option value="ELECTRICAL">ELECTRICAL SYSTEM</option>
+                    <option value="UNDERCARRIAGE">UNDERCARRIAGE</option>
+                    <option value="BRAKE">BRAKE &amp; STEERING</option>
+                    <option value="CHASSIS">CHASSIS &amp; ATTACHMENT</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Leader Mekanik / PIC</label>
+                  <input
+                    type="text"
+                    value={form.tech}
+                    onChange={e => setForm({ ...form, tech: e.target.value })}
+                    placeholder="Nama mekanik penanggung jawab..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Dynamic Parts Usage Section */}
+              <div className="pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-bold text-slate-700 text-xs">Alokasi Suku Cadang &amp; Pelumas</span>
+                  <button
+                    type="button"
+                    onClick={handleAddPartRow}
+                    className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] flex items-center space-x-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Tambah Baris Part</span>
+                  </button>
+                </div>
+
+                {partRows.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 italic py-2">Belum ada suku cadang ditambahkan.</p>
+                ) : (
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {partRows.map((row, idx) => (
+                      <div key={idx} className="flex items-center space-x-2">
+                        <input
+                          type="text"
+                          placeholder="Part Number"
+                          value={row.part_number}
+                          onChange={e => handlePartRowChange(idx, 'part_number', e.target.value)}
+                          className="w-36 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Nama Barang / Deskripsi"
+                          value={row.part_name}
+                          onChange={e => handlePartRowChange(idx, 'part_name', e.target.value)}
+                          className="flex-1 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Qty"
+                          value={row.qty}
+                          onChange={e => handlePartRowChange(idx, 'qty', Number(e.target.value))}
+                          className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-center"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Satuan"
+                          value={row.uom}
+                          onChange={e => handlePartRowChange(idx, 'uom', e.target.value)}
+                          className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-center"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePartRow(idx)}
+                          className="p-1 text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Log / Catatan */}
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Tindakan Perbaikan &amp; Catatan</label>
+                <textarea
+                  rows={2}
+                  value={form.action_log}
+                  onChange={e => setForm({ ...form, action_log: e.target.value })}
+                  placeholder="Catatan pelaksanaan pekerjaan teknis..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-blue-500 resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-600/20"
+                >
+                  {submitting ? 'Menyimpan...' : (isEditMode ? 'Perbarui Work Order' : 'Simpan Work Order')}
                 </button>
               </div>
             </form>

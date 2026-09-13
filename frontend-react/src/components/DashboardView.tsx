@@ -14,10 +14,14 @@ import {
   Layers,
   Search,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  ShieldAlert,
+  X
 } from 'lucide-react';
 import { Equipment, WorkOrder, Backlog, DailyHM } from '../types';
 import { NavTab } from './Sidebar';
+import { printExecutiveReport } from '../utils/printUtils';
+import { api } from '../services/api';
 
 interface DashboardViewProps {
   equipments: Equipment[];
@@ -90,8 +94,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .filter(b => (b.prioritas || '').toUpperCase() === 'HIGH' || (b.prioritas || '').toUpperCase() === 'CRITICAL')
     .slice(0, 5);
 
+  const [isBDModalOpen, setIsBDModalOpen] = useState(false);
+  const [submittingBD, setSubmittingBD] = useState(false);
+  const [bdForm, setBdForm] = useState({
+    equip_no: equipments[0]?.equip_no || equipments[0]?.no_unit || '',
+    kendala: '',
+    pelapor: 'Top Management',
+    shift: '1'
+  });
+
   const handlePrintExecutive = () => {
-    window.print();
+    printExecutiveReport(
+      {
+        pa: physicalAvailability,
+        rfu: readyCount,
+        rwn: warningCount,
+        bd: breakdownCount,
+        totalHours: equipments.length * 24 * 30,
+        downtimeHours: breakdownCount * 120
+      },
+      equipments,
+      workOrders,
+      { start: startDate, end: endDate }
+    );
+  };
+
+  const handleSaveBDAwal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bdForm.equip_no || !bdForm.kendala.trim()) {
+      alert('Pilih nomor lambung unit dan isi kendala kerusakan!');
+      return;
+    }
+    try {
+      setSubmittingBD(true);
+      const res = await api.saveBDAwal(bdForm);
+      if (res.success) {
+        setIsBDModalOpen(false);
+        setBdForm({
+          equip_no: equipments[0]?.equip_no || equipments[0]?.no_unit || '',
+          kendala: '',
+          pelapor: 'Top Management',
+          shift: '1'
+        });
+        window.location.reload();
+      } else {
+        alert(res.message || 'Gagal melaporkan breakdown');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    } finally {
+      setSubmittingBD(false);
+    }
   };
 
   return (
@@ -131,6 +184,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             type="button"
+            onClick={() => setIsBDModalOpen(true)}
+            className="bg-red-600/80 hover:bg-red-600 text-white px-3.5 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer border border-red-500/60"
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-white" />
+            <span>Quick B/D</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handlePrintExecutive}
             className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
           >
@@ -139,6 +201,74 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Modal Quick Breakdown Awal */}
+      {isBDModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2 text-red-600 font-bold text-sm">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <span>Pelaporan Cepat Breakdown Awal</span>
+              </div>
+              <button onClick={() => setIsBDModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBDAwal} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Nomor Lambung Unit Breakdown *</label>
+                <select
+                  value={bdForm.equip_no}
+                  onChange={e => setBdForm({ ...bdForm, equip_no: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-red-500"
+                  required
+                >
+                  {equipments.map(eq => (
+                    <option key={eq.id || eq.equip_no} value={eq.equip_no || eq.no_unit}>
+                      {eq.equip_no || eq.no_unit} - {eq.model || eq.type} ({eq.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Kendala / Kerusakan di Lokasi *</label>
+                <textarea
+                  rows={3}
+                  value={bdForm.kendala}
+                  onChange={e => setBdForm({ ...bdForm, kendala: e.target.value })}
+                  placeholder="Contoh: Hose hidrolik boom pecah, radiator overheat..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-red-500 resize-none"
+                  required
+                />
+              </div>
+
+              <div className="p-3 bg-red-50 border border-red-200/80 rounded-xl text-[11px] text-red-700 leading-relaxed">
+                Unit akan langsung ditandai berstatus <strong>B/D (Breakdown)</strong> pada sistem, dan nomor tiket Work Order darurat akan dibuat otomatis.
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBDModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingBD}
+                  className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold shadow-md shadow-red-600/20"
+                >
+                  {submittingBD ? 'Menyimpan...' : 'Kunci Breakdown Unit'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* 2. 4 KARTU METRIK UTAMA EKSEKUTIF (STANDAR ENGINEERING HEAVY EQUIPMENT) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">

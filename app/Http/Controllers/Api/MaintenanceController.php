@@ -302,8 +302,23 @@ class MaintenanceController extends Controller
 
         return [
             'success' => true,
-            'equip' => $this->mapRecords(MasterEquip::all()),
-            'parts' => $this->mapRecords(MasterPart::all()),
+            'equip' => MasterEquip::all()->map(function($eq) {
+                $arr = $eq->toArray();
+                $arr['no_unit'] = $arr['equip_no'] ?? ($arr['no_unit'] ?? '');
+                $arr['tipe'] = $arr['unit_type'] ?? ($arr['tipe'] ?? '');
+                $arr['serial_number'] = $arr['serial_no'] ?? ($arr['serial_number'] ?? '');
+                $arr['lokasi'] = $arr['location'] ?? ($arr['lokasi'] ?? 'Site Plant');
+                $arr['last_hm'] = $arr['last_hm'] ?? 0;
+                return $arr;
+            })->values()->all(),
+            'parts' => MasterPart::all()->map(function($p) {
+                $arr = $p->toArray();
+                $arr['part_name'] = $arr['description'] ?? ($arr['part_name'] ?? '');
+                $arr['unit'] = $arr['uom'] ?? ($arr['unit'] ?? 'PCS');
+                $arr['stock_qty'] = $arr['stock'] ?? ($arr['stock_qty'] ?? 0);
+                $arr['category'] = $arr['category_spare_part'] ?? ($arr['category'] ?? 'Fast Moving');
+                return $arr;
+            })->values()->all(),
             'stock' => $this->mapRecords(Stock::all()),
             'planAlat' => $planAlat,
             'planService' => $this->mapRecords(PlanService::all()),
@@ -345,7 +360,8 @@ class MaintenanceController extends Controller
             'masterTools' => $this->mapRecords(MasterTool::all()),
             'userAccess' => $userAccessMap,
             'settings' => $this->getSettingsArray(),
-            'planHours' => $planAlat
+            'planHours' => $planAlat,
+            'systemLogs' => $this->mapRecords(SystemLog::orderByDesc('id')->limit(50)->get())
         ];
     }
 
@@ -493,6 +509,18 @@ class MaintenanceController extends Controller
         ];
 
         WorkOrder::updateOrCreate(['no_wo' => $no_wo], $fields);
+
+        // Sync unit status in MasterEquip if equipment number is given
+        if (!empty($fields['equip_no'])) {
+            $unitStatus = 'RFU';
+            if (strtoupper($fields['status']) === 'BREAKDOWN' || strtoupper($fields['sch_unsch']) === 'UNSCHEDULED') {
+                $unitStatus = 'B/D';
+            } elseif (in_array(strtoupper($fields['status']), ['OPEN', 'IN PROGRESS', 'WAITING PART'])) {
+                $unitStatus = 'RWN';
+            }
+            MasterEquip::where('equip_no', $fields['equip_no'])->update(['status' => $unitStatus]);
+        }
+
         return ['success' => true, 'message' => "Work Order {$no_wo} berhasil disimpan", 'no_wo' => $no_wo];
     }
 
@@ -506,6 +534,13 @@ class MaintenanceController extends Controller
         if (isset($data['action_log'])) $update['action_log'] = $data['action_log'];
 
         WorkOrder::where('no_wo', $no_wo)->update($update);
+
+        $wo = WorkOrder::where('no_wo', $no_wo)->first();
+        if ($wo && !empty($wo->equip_no)) {
+            $unitStatus = (strtoupper($status) === 'CLOSED') ? 'RFU' : (strtoupper($status) === 'BREAKDOWN' ? 'B/D' : 'RWN');
+            MasterEquip::where('equip_no', $wo->equip_no)->update(['status' => $unitStatus]);
+        }
+
         return ['success' => true, 'message' => "Status WO {$no_wo} diubah ke {$status}"];
     }
 
@@ -628,23 +663,81 @@ class MaintenanceController extends Controller
     public function saveMaster($data)
     {
         $type = $data['type'] ?? '';
-        $payload = $data['payload'] ?? $data;
+        $payload = $data['payload'] ?? $data['data'] ?? $data;
 
         switch ($type) {
             case 'MasterEquip':
-                MasterEquip::updateOrCreate(['equip_no' => $payload['equip_no']], $payload);
+            case 'equip':
+                $equipNo = $payload['equip_no'] ?? $payload['no_unit'] ?? '';
+                $cleanPayload = [
+                    'equip_no' => $equipNo,
+                    'model' => $payload['model'] ?? '',
+                    'brand' => $payload['brand'] ?? '',
+                    'unit_type' => $payload['tipe'] ?? $payload['unit_type'] ?? '',
+                    'serial_no' => $payload['serial_number'] ?? $payload['serial_no'] ?? '',
+                    'location' => $payload['lokasi'] ?? $payload['location'] ?? 'Site Plant',
+                    'status' => $payload['status'] ?? 'READY',
+                    'warranty_status' => $payload['warranty_status'] ?? 'Active'
+                ];
+                MasterEquip::updateOrCreate(['equip_no' => $equipNo], $cleanPayload);
                 break;
             case 'PlanAlat':
-                PlanAlat::updateOrCreate(['equip_no' => $payload['equip_no']], $payload);
+                PlanAlat::updateOrCreate(['equip_no' => $payload['equip_no']], [
+                    'equip_no' => $payload['equip_no'],
+                    'model' => $payload['model'] ?? '',
+                    'plan_hours_per_month' => $payload['plan_hours_per_month'] ?? 0,
+                    'plan_pa' => $payload['plan_pa'] ?? 0,
+                    'mohh' => $payload['mohh'] ?? 0,
+                    'category' => $payload['category'] ?? '',
+                    'status' => $payload['status'] ?? 'ACTIVE'
+                ]);
                 break;
             case 'PlanService':
-                PlanService::updateOrCreate(['equip_no' => $payload['equip_no']], $payload);
+                PlanService::updateOrCreate(['equip_no' => $payload['equip_no']], [
+                    'equip_no' => $payload['equip_no'],
+                    'model' => $payload['model'] ?? '',
+                    'kategori' => $payload['kategori'] ?? 'PS 250',
+                    'last_service_date' => $payload['last_service_date'] ?? '',
+                    'last_service_hm' => $payload['last_service_hm'] ?? 0,
+                    'next_service_hm' => $payload['next_service_hm'] ?? 0,
+                    'plan_hours_per_month' => $payload['plan_hours_per_month'] ?? 0
+                ]);
                 break;
             case 'MasterParts':
-                MasterPart::updateOrCreate(['part_number' => $payload['part_number']], $payload);
-                Stock::updateOrCreate(['part_number' => $payload['part_number']], $payload);
+            case 'parts':
+            case 'part':
+                $partNo = $payload['part_number'] ?? $payload['partNo'] ?? '';
+                $desc = $payload['part_name'] ?? $payload['description'] ?? $payload['name'] ?? '';
+                $uom = $payload['unit'] ?? $payload['uom'] ?? 'PCS';
+                $stockQty = $payload['stock_qty'] ?? $payload['stock'] ?? $payload['qty'] ?? 0;
+                $minStock = $payload['min_stock'] ?? 0;
+                $price = $payload['price'] ?? 0;
+                $cat = $payload['category'] ?? $payload['category_spare_part'] ?? 'Fast Moving';
+                $bin = $payload['bin_location'] ?? 'WH-A';
+
+                MasterPart::updateOrCreate(['part_number' => $partNo], [
+                    'part_number' => $partNo,
+                    'description' => $desc,
+                    'uom' => $uom,
+                    'stock' => $stockQty,
+                    'min_stock' => $minStock,
+                    'price' => $price,
+                    'category_spare_part' => $cat,
+                    'qty_final' => $stockQty
+                ]);
+                Stock::updateOrCreate(['part_number' => $partNo], [
+                    'part_number' => $partNo,
+                    'description' => $desc,
+                    'uom' => $uom,
+                    'stock' => $stockQty,
+                    'min_stock' => $minStock,
+                    'price' => $price,
+                    'category_spare_part' => $cat,
+                    'qty_final' => $stockQty
+                ]);
                 break;
             case 'MasterComponent':
+            case 'component':
                 MasterComponent::create($payload);
                 break;
             default:

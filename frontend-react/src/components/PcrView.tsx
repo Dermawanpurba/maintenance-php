@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Cpu, Search, AlertTriangle, Clock, Plus, CheckCircle2 } from 'lucide-react';
+import { Cpu, Search, AlertTriangle, Clock, Plus, CheckCircle2, Trash2, X } from 'lucide-react';
 import { PcrItem, Equipment } from '../types';
+import { api } from '../services/api';
 
 interface PcrViewProps {
   pcrList: PcrItem[];
@@ -10,6 +11,18 @@ interface PcrViewProps {
 
 export const PcrView: React.FC<PcrViewProps> = ({ pcrList, equipments, onRefresh }) => {
   const [search, setSearch] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [form, setForm] = useState<Partial<PcrItem>>({
+    equip_no: equipments[0]?.no_unit || '',
+    component_name: '',
+    target_lifetime_hm: 10000,
+    current_hm: 0,
+    estimated_cost: 50000000,
+    scheduled_date: new Date().toISOString().split('T')[0],
+    status: 'MONITORING',
+  });
 
   const fallbackPcr: PcrItem[] = pcrList.length > 0 ? pcrList : [
     {
@@ -46,6 +59,62 @@ export const PcrView: React.FC<PcrViewProps> = ({ pcrList, equipments, onRefresh
       scheduled_date: '2026-10-30'
     }
   ];
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.component_name || !form.equip_no) {
+      alert('Nama komponen dan No. Unit wajib diisi!');
+      return;
+    }
+
+    const target = Number(form.target_lifetime_hm || 10000);
+    const current = Number(form.current_hm || 0);
+    const remaining = Math.max(0, target - current);
+
+    try {
+      setSubmitting(true);
+      const res = await api.savePCR({
+        ...form,
+        target_lifetime_hm: target,
+        current_hm: current,
+        remaining_hm: remaining,
+      });
+
+      if (res.success) {
+        setIsModalOpen(false);
+        setForm({
+          equip_no: equipments[0]?.no_unit || '',
+          component_name: '',
+          target_lifetime_hm: 10000,
+          current_hm: 0,
+          estimated_cost: 50000000,
+          scheduled_date: new Date().toISOString().split('T')[0],
+          status: 'MONITORING',
+        });
+        onRefresh();
+      } else {
+        alert(res.message || 'Gagal menyimpan data PCR');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string | number) => {
+    if (!window.confirm('Hapus jadwal Plan Component Replacement (PCR) ini?')) return;
+    try {
+      const res = await api.deletePCR(id);
+      if (res.success) {
+        onRefresh();
+      } else {
+        alert(res.message || 'Gagal menghapus');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
 
   const filtered = fallbackPcr.filter(p => {
     const q = search.toLowerCase();
@@ -111,15 +180,25 @@ export const PcrView: React.FC<PcrViewProps> = ({ pcrList, equipments, onRefresh
               Monitoring umur pakai komponen utama dan target lifetime hour meter
             </p>
           </div>
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Cari unit / komponen..."
-              className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 text-slate-800 placeholder-slate-400 font-medium w-48 sm:w-60"
-            />
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Cari unit / komponen..."
+                className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 text-slate-800 placeholder-slate-400 font-medium w-44 sm:w-56"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black shadow-sm shadow-orange-500/30 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Catat Jadwal PCR</span>
+            </button>
           </div>
         </div>
 
@@ -133,13 +212,14 @@ export const PcrView: React.FC<PcrViewProps> = ({ pcrList, equipments, onRefresh
                 <th className="py-3 px-4">Running HM</th>
                 <th className="py-3 px-4">Sisa Jam Operasi</th>
                 <th className="py-3 px-4">Status &amp; Rencana</th>
+                <th className="py-3 px-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filtered.map((p, idx) => {
                 const target = Number(p.target_lifetime_hm || 10000);
                 const current = Number(p.current_hm || 0);
-                const remain = Number(p.remaining_hm || target - current);
+                const remain = Number(p.remaining_hm || (target - current > 0 ? target - current : 0));
                 const pct = target > 0 ? Math.round((current / target) * 100) : 0;
                 const isCritical = remain <= 1500;
 
@@ -178,6 +258,16 @@ export const PcrView: React.FC<PcrViewProps> = ({ pcrList, equipments, onRefresh
                         {p.status || 'MONITORING'}
                       </span>
                     </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(p.item_id || p.id || '')}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Hapus Jadwal PCR"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -185,6 +275,137 @@ export const PcrView: React.FC<PcrViewProps> = ({ pcrList, equipments, onRefresh
           </table>
         </div>
       </div>
+
+      {/* Modal Dialog */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 w-full max-w-lg shadow-2xl relative">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold">
+                  <Cpu className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-black text-slate-900 tracking-tight">
+                  Perencanaan Ganti Komponen (PCR)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4 mt-4 text-xs font-semibold">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 mb-1">No. Unit Alat Berat</label>
+                  <select
+                    value={form.equip_no}
+                    onChange={e => setForm({ ...form, equip_no: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-orange-500 font-bold"
+                  >
+                    {equipments.map(eq => (
+                      <option key={eq.id} value={eq.no_unit}>
+                        {eq.no_unit} - {eq.model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-600 mb-1">Status Rencana</label>
+                  <select
+                    value={form.status}
+                    onChange={e => setForm({ ...form, status: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-orange-500 font-bold"
+                  >
+                    <option value="MONITORING">MONITORING</option>
+                    <option value="PERSIAPAN PR">PERSIAPAN PR</option>
+                    <option value="WAITING PARTS">WAITING PARTS</option>
+                    <option value="SCHEDULED">SCHEDULED</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 mb-1">Nama Major Komponen</label>
+                <input
+                  type="text"
+                  value={form.component_name}
+                  onChange={e => setForm({ ...form, component_name: e.target.value })}
+                  placeholder="Contoh: Engine Complete Cummins / Transmission / Main Pump"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-orange-500 font-medium"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 mb-1">Target Lifetime (Jam/HM)</label>
+                  <input
+                    type="number"
+                    value={form.target_lifetime_hm}
+                    onChange={e => setForm({ ...form, target_lifetime_hm: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-orange-500 font-mono font-bold"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 mb-1">Running HM Komponen</label>
+                  <input
+                    type="number"
+                    value={form.current_hm}
+                    onChange={e => setForm({ ...form, current_hm: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-orange-500 font-mono font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 mb-1">Estimasi Biaya Komponen (Rp)</label>
+                  <input
+                    type="number"
+                    value={form.estimated_cost}
+                    onChange={e => setForm({ ...form, estimated_cost: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-orange-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 mb-1">Estimasi Tanggal Penggantian</label>
+                  <input
+                    type="date"
+                    value={form.scheduled_date}
+                    onChange={e => setForm({ ...form, scheduled_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-orange-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-md shadow-orange-500/20 active:scale-95 disabled:opacity-50"
+                >
+                  {submitting ? 'Menyimpan...' : 'Simpan Jadwal PCR'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
