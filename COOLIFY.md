@@ -126,11 +126,11 @@ FILESYSTEM_DISK=public
 
 Setelah deployment selesai, aplikasi dapat diakses dengan rute:
 - **`https://maintenance.domainanda.com/`**
-  - Menyajikan antarmuka **Modern React Executive Dashboard** (Monitoring Armada, KPI Status, Filter Cepat, Health Server).
-- **`https://maintenance.domainanda.com/classic`** atau **`/maintenance`**
-  - Menyajikan **WOSys Full ERP Suite (17.750 baris)** untuk form detail Work Order, inspeksi kelayakan unit (P2H), PCR, Swab Component, FAR, Notulen Rapat, dan Tools Tracker.
+  - Menyajikan antarmuka **Pure React 18 SPA (WOSys ERP)** lengkap dengan 11 modul: Dashboard KPI, Monitoring Armada, Work Orders, Backlog Defect, Hour Meter & Fuel, Inspeksi P2H Digital, Katalog Part & Stok, Special Tools Tracker, Swab Komponen, FAR Laporan Kerusakan, Notulen Rapat, dan Status Server.
 - **`https://maintenance.domainanda.com/api/backup/download`**
   - Tombol unduh arsip mandiri (.ZIP) yang mengompresi database SQLite, seluruh file unggahan fisik, dan data JSON terstruktur.
+- **`https://maintenance.domainanda.com/api/maintenance/router`**
+  - REST API endpoint untuk seluruh operasi sinkronisasi data.
 
 ---
 

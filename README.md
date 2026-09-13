@@ -38,7 +38,7 @@ Proyek ini merupakan hasil migrasi profesional dari aplikasi **Google Apps Scrip
 - **Database Utama**: SQLite 3 (`database/database.sqlite` - Zero-Config, tanpa perlu start XAMPP MySQL).
 - **Ekspor MySQL / phpMyAdmin**: `database/maintenance_database_phpmyadmin.sql` (dapat langsung di-import ke phpMyAdmin jika ingin berpindah ke MySQL).
 - **Port Khusus**: `8003` (menghindari bentrok dengan port 8000, 8001, atau 8002).
-- **Frontend SPA**: `resources/views/maintenance.blade.php` (berisi 17.700+ baris modul UI lengkap: Work Order, Backlog, Daily HM, P2H Inspection, PCR, Service History, PM Scheduler, Swab Component, Failure Analysis, Inventory Parts, Meeting Notes, Tools Tracker, Reporting & Analytics).
+- **Frontend SPA**: Pure **React 18 + Vite + TailwindCSS + Lucide Icons** (`frontend-react/` - Viewport `100dvh`, 11 Modul ERP Pemeliharaan Terpadu: Dashboard KPI, Monitoring Armada, Work Order, Backlog Defect, Log Hour Meter & Fuel, Inspeksi P2H, Katalog Part & Stok, Special Tools Tracker, Swab Komponen, FAR, Notulen Rapat, dan Status Sistem).
 - **API Router Terpadu**:
   - Endpoint: `POST /api/maintenance/router`
   - Kompatibel 100% dengan payload GAS `fetchGAS(action, data)` tanpa mengubah logika JavaScript yang ada.

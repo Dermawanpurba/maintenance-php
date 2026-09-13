@@ -2,12 +2,15 @@
 
 use Illuminate\Support\Facades\Route;
 
-// === MAINTENANCE MANAGEMENT SYSTEM (WOSYS ERP - PROFESSIONAL) ===
-// Port: 8003 | SQLite 3 Standalone
-// Frontend Blade SPA: resources/views/maintenance.blade.php
-// REST API Backend: /api/maintenance/*
+// === WOSYS ERP - PURE REACT 18 SINGLE PAGE APPLICATION (SPA) ===
+// All web routing is handled by React Frontend (Clean URL)
 
-Route::get('/', fn () => view('maintenance'));
-Route::get('/classic', fn () => view('maintenance'));
-Route::get('/maintenance', fn () => view('maintenance'));
-Route::get('/dashboard', fn () => view('maintenance'));
+Route::get('/{any?}', function () {
+    $indexPath = public_path('index.html');
+    if (file_exists($indexPath)) {
+        return response()->file($indexPath, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+        ]);
+    }
+    return response('React Frontend build (index.html) tidak ditemukan di folder public.', 404);
+})->where('any', '.*');
