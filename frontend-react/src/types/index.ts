@@ -93,12 +93,51 @@ export interface FARRecord {
 
 export interface MeetingNote {
   id?: number | string;
-  tanggal: string;
-  title: string;
-  agenda: string;
-  decision: string;
+  item_id?: string;
+  tanggal?: string;
+  topic?: string;
+  title?: string;
+  agenda?: string;
+  discussion_summary?: string;
+  decision?: string;
+  management_decision?: string;
   attendees?: string;
+  leader?: string;
   pic?: string;
+  status?: string;
+  plant_health?: string;
+  critical_issue?: string;
+}
+
+export interface MonthlyBudgetItem {
+  id?: number | string;
+  item_id?: string;
+  bulan?: string;
+  month_year?: number;
+  kategori?: string;
+  category?: string;
+  anggaran?: number;
+  budget_plan?: number;
+  realisasi?: number;
+  actual_spent?: number;
+  selisih?: number;
+  variance?: number;
+  keterangan?: string;
+  notes?: string;
+  status?: string;
+}
+
+export interface PcrItem {
+  id?: number | string;
+  item_id?: string;
+  equip_no?: string;
+  component_name?: string;
+  target_lifetime_hm?: number;
+  current_hm?: number;
+  remaining_hm?: number;
+  status?: string;
+  estimated_cost?: number;
+  scheduled_date?: string;
 }
 
 export interface SystemLogItem {

@@ -91,157 +91,160 @@ export const P2hInspectionView: React.FC<P2hInspectionViewProps> = ({ equipments
   };
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto">
+    <div className="space-y-6 pb-12 max-w-4xl mx-auto">
       {/* Header card */}
-      <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white border border-slate-200/80 p-5 md:p-6 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="font-bold text-white text-sm flex items-center space-x-2">
-            <ClipboardCheck className="w-5 h-5 text-emerald-400" />
-            <span>Formulir Inspeksi Kelayakan Harian (P2H Digital)</span>
-          </h3>
-          <p className="text-slate-400 text-xs mt-0.5">
-            Pemeriksaan menyeluruh sebelum alat dioperasikan di lapangan (Pre-Start Safety Check).
+          <div className="flex items-center space-x-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <ClipboardCheck className="w-5 h-5" />
+            </div>
+            <h3 className="font-black text-slate-900 text-base tracking-tight">
+              P2H Digital &amp; Checklist Kelayakan Harian
+            </h3>
+          </div>
+          <p className="text-slate-500 text-xs mt-1">
+            Pre-Start Safety Inspection sebelum alat berat beroperasi di front tambang
           </p>
         </div>
 
         {/* Status badges */}
         <div className="flex items-center space-x-2">
           {failCount > 0 ? (
-            <span className="px-3 py-1 rounded-lg bg-rose-950/80 text-rose-300 border border-rose-800 text-xs font-bold flex items-center space-x-1">
+            <span className="px-3 py-1.5 rounded-xl bg-red-100 text-red-700 text-xs font-black flex items-center space-x-1.5 border border-red-200">
               <XCircle className="w-4 h-4" />
-              <span>{failCount} DEFECT (TIDAK SIAP)</span>
+              <span>{failCount} DEFECT (STOP OPERASI)</span>
             </span>
           ) : warningCount > 0 ? (
-            <span className="px-3 py-1 rounded-lg bg-amber-950/80 text-amber-300 border border-amber-800 text-xs font-bold flex items-center space-x-1">
+            <span className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-700 text-xs font-black flex items-center space-x-1.5 border border-amber-200">
               <AlertTriangle className="w-4 h-4" />
-              <span>{warningCount} PERLU PENGAWASAN</span>
+              <span>{warningCount} PERLU MONITOR</span>
             </span>
           ) : (
-            <span className="px-3 py-1 rounded-lg bg-emerald-950/80 text-emerald-300 border border-emerald-800 text-xs font-bold flex items-center space-x-1">
+            <span className="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-700 text-xs font-black flex items-center space-x-1.5 border border-emerald-200">
               <CheckCircle2 className="w-4 h-4" />
-              <span>LAIK OPERASI (FIT)</span>
+              <span>UNIT LAYAK OPERASI (RFU)</span>
             </span>
           )}
         </div>
       </div>
 
-      {submittedSuccess && (
-        <div className="p-3 bg-emerald-950/80 border border-emerald-700 text-emerald-300 rounded-xl text-xs flex items-center space-x-2 font-semibold animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Hasil inspeksi P2H berhasil disimpan dan tersinkronisasi ke sistem!</span>
-        </div>
-      )}
-
-      {/* Meta Input Card */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+      {/* Form Card */}
+      <form onSubmit={handleSubmit} className="bg-white border border-slate-200/80 p-5 md:p-6 rounded-3xl shadow-sm space-y-6">
+        {/* Info Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50 border border-slate-200/70 rounded-2xl text-xs font-semibold">
           <div>
-            <label className="block text-slate-400 mb-1 font-semibold">Pilih Unit Alat Berat</label>
+            <label className="block text-slate-600 mb-1">Pilih Unit Armada</label>
             <select
               value={selectedUnit}
               onChange={e => setSelectedUnit(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white font-bold"
+              className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 outline-none focus:border-blue-500 font-bold"
             >
               {equipments.map(eq => (
-                <option key={eq.no_unit} value={eq.no_unit}>
-                  {eq.no_unit} - {eq.tipe} ({eq.model || '-'})
+                <option key={eq.id} value={eq.no_unit}>
+                  {eq.no_unit} - {eq.model}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-slate-400 mb-1 font-semibold">Nama Petugas / Operator</label>
-            <input
-              type="text"
-              required
-              value={inspector}
-              onChange={e => setInspector(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 mb-1 font-semibold">Shift Kerja</label>
+            <label className="block text-slate-600 mb-1">Shift Kerja</label>
             <select
               value={shift}
               onChange={e => setShift(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white"
+              className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 outline-none focus:border-blue-500 font-bold"
             >
               <option value="Shift 1">Shift 1 (Pagi / Siang)</option>
               <option value="Shift 2">Shift 2 (Malam)</option>
             </select>
           </div>
+
+          <div>
+            <label className="block text-slate-600 mb-1">Nama Operator / Pengawas</label>
+            <input
+              type="text"
+              value={inspector}
+              onChange={e => setInspector(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 outline-none focus:border-blue-500"
+            />
+          </div>
         </div>
 
-        {/* Checklist items */}
-        <div className="bg-slate-900/60 rounded-xl border border-slate-800 divide-y divide-slate-800/80 overflow-hidden shadow-lg">
-          {items.map((item, idx) => (
-            <div key={item.id} className="p-3.5 hover:bg-slate-800/30 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="space-y-0.5 max-w-md">
-                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-                  {item.category}
+        {/* Checklist Rows */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
+            Daftar Poin Pemeriksaan Visual &amp; Fisik
+          </h4>
+
+          {items.map(it => (
+            <div
+              key={it.id}
+              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+            >
+              <div className="space-y-0.5">
+                <span className="text-[10px] uppercase font-black tracking-wider text-blue-600">
+                  {it.category}
                 </span>
-                <p className="font-semibold text-white">{item.label}</p>
+                <p className="font-bold text-slate-800">{it.label}</p>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center rounded-lg bg-slate-950 p-1 border border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => handleStatusChange(item.id, 'PASS')}
-                    className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
-                      item.status === 'PASS'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    BAIK (PASS)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleStatusChange(item.id, 'WARNING')}
-                    className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
-                      item.status === 'WARNING'
-                        ? 'bg-amber-600 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    PERHATIAN
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleStatusChange(item.id, 'FAIL')}
-                    className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
-                      item.status === 'FAIL'
-                        ? 'bg-rose-600 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    RUSAK (FAIL)
-                  </button>
-                </div>
-
-                <input
-                  type="text"
-                  placeholder="Catatan / Keterangan..."
-                  value={item.note}
-                  onChange={e => handleNoteChange(item.id, e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 text-xs placeholder-slate-500 w-36 sm:w-48 focus:outline-none focus:border-emerald-500"
-                />
+              <div className="flex items-center space-x-2 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleStatusChange(it.id, 'PASS')}
+                  className={`px-3 py-1.5 rounded-xl font-black text-xs transition-colors cursor-pointer ${
+                    it.status === 'PASS'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  OK (Normal)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStatusChange(it.id, 'WARNING')}
+                  className={`px-3 py-1.5 rounded-xl font-black text-xs transition-colors cursor-pointer ${
+                    it.status === 'WARNING'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  Note (Perlu Cek)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStatusChange(it.id, 'FAIL')}
+                  className={`px-3 py-1.5 rounded-xl font-black text-xs transition-colors cursor-pointer ${
+                    it.status === 'FAIL'
+                      ? 'bg-red-600 text-white shadow-sm'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  Defect (Rusak)
+                </button>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="flex justify-end pt-2">
+        {/* Submit Bar */}
+        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+          <div>
+            {submittedSuccess && (
+              <span className="text-xs font-bold text-emerald-600 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Hasil P2H berhasil disimpan dan tersinkronisasi!</span>
+              </span>
+            )}
+          </div>
           <button
             type="submit"
             disabled={submitting}
-            className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 transition-all hover:-translate-y-0.5"
+            className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
           >
             <Send className="w-4 h-4" />
-            <span>{submitting ? 'Menyimpan Hasil P2H...' : 'Kirim Laporan Inspeksi P2H'}</span>
+            <span>{submitting ? 'Menyimpan...' : 'Kirim Laporan P2H'}</span>
           </button>
         </div>
       </form>

@@ -12,6 +12,9 @@ import { ToolsTrackerView } from './components/ToolsTrackerView';
 import { SwabView } from './components/SwabView';
 import { FailureAnalysisView } from './components/FailureAnalysisView';
 import { MeetingNotesView } from './components/MeetingNotesView';
+import { MonthlyBudgetView } from './components/MonthlyBudgetView';
+import { PcrView } from './components/PcrView';
+import { PreventiveMaintenanceView } from './components/PreventiveMaintenanceView';
 import { SystemHealthView } from './components/SystemHealthView';
 import { MobileLiquidDock } from './components/MobileLiquidDock';
 import { api } from './services/api';
@@ -24,7 +27,9 @@ import {
   ToolItem,
   SwabRecord,
   FARRecord,
-  MeetingNote
+  MeetingNote,
+  MonthlyBudgetItem,
+  PcrItem
 } from './types';
 import { RefreshCw } from 'lucide-react';
 
@@ -46,6 +51,8 @@ export const App: React.FC = () => {
   const [swabs, setSwabs] = useState<SwabRecord[]>([]);
   const [fars, setFars] = useState<FARRecord[]>([]);
   const [meetingNotes, setMeetingNotes] = useState<MeetingNote[]>([]);
+  const [monthlyBudgets, setMonthlyBudgets] = useState<MonthlyBudgetItem[]>([]);
+  const [pcrList, setPcrList] = useState<PcrItem[]>([]);
 
   const loadData = async () => {
     const startTime = performance.now();
@@ -66,6 +73,8 @@ export const App: React.FC = () => {
         setSwabs(data.swabComponents || []);
         setFars(data.farRecords || []);
         setMeetingNotes(data.meetingNotes || []);
+        setMonthlyBudgets(data.monthlyBudget || []);
+        setPcrList(data.pcr || []);
       }
     } catch (err) {
       console.error('Failed to fetch data from API:', err);
@@ -127,13 +136,26 @@ export const App: React.FC = () => {
               </div>
             ) : (
               <>
-                {currentTab === 'dashboard' && (
+                {(currentTab === 'dashboard' || currentTab === 'top_management') && (
                   <DashboardView
                     equipments={equipments}
                     workOrders={workOrders}
                     backlogs={backlogs}
                     dailyHms={dailyHms}
                     onNavigate={tab => setCurrentTab(tab)}
+                  />
+                )}
+                {currentTab === 'monthly_budget' && (
+                  <MonthlyBudgetView budgets={monthlyBudgets} onRefresh={loadData} />
+                )}
+                {currentTab === 'pcr' && (
+                  <PcrView pcrList={pcrList} equipments={equipments} onRefresh={loadData} />
+                )}
+                {['pm_washing', 'pm_greasing', 'pm_inspection', 'pm_torque', 'pm_battery'].includes(currentTab) && (
+                  <PreventiveMaintenanceView
+                    category={currentTab as any}
+                    equipments={equipments}
+                    onRefresh={loadData}
                   />
                 )}
                 {currentTab === 'fleet' && (
@@ -154,6 +176,13 @@ export const App: React.FC = () => {
                   />
                 )}
                 {currentTab === 'daily_hm' && (
+                  <DailyHmView
+                    dailyHms={dailyHms}
+                    equipments={equipments}
+                    onRefresh={loadData}
+                  />
+                )}
+                {currentTab === 'aktifitas' && (
                   <DailyHmView
                     dailyHms={dailyHms}
                     equipments={equipments}

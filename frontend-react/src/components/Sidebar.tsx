@@ -27,22 +27,30 @@ import {
   HardDrive,
   ChevronDown,
   ChevronLeft,
-  X,
-  LogOut
+  X
 } from 'lucide-react';
 
 export type NavTab =
+  | 'top_management'
   | 'dashboard'
-  | 'fleet'
   | 'wo'
   | 'backlog'
-  | 'daily_hm'
-  | 'p2h'
-  | 'parts'
-  | 'tools'
+  | 'pm_washing'
+  | 'pm_greasing'
+  | 'pm_inspection'
+  | 'pm_torque'
+  | 'pm_battery'
+  | 'pcr'
   | 'swab'
   | 'far'
+  | 'p2h'
+  | 'daily_hm'
+  | 'aktifitas'
+  | 'monthly_budget'
   | 'meetings'
+  | 'fleet'
+  | 'parts'
+  | 'tools'
   | 'system';
 
 interface SidebarProps {
@@ -58,20 +66,22 @@ interface SidebarProps {
   };
 }
 
+interface MenuItem {
+  id: NavTab | 'admin_redirect';
+  label: string;
+  icon: React.FC<any>;
+  iconColor: string;
+  count?: number;
+  isExternal?: boolean;
+  url?: string;
+}
+
 interface MenuGroup {
   id: string;
   label: string;
   icon: React.FC<any>;
   iconColor: string;
-  items: {
-    id: NavTab | 'admin_redirect';
-    label: string;
-    icon: React.FC<any>;
-    iconColor: string;
-    count?: number;
-    isExternal?: boolean;
-    url?: string;
-  }[];
+  items: MenuItem[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -85,10 +95,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     exec: true,
     wo: true,
-    pm: false,
+    pm: true,
     reliability: false,
     daily: false,
-    plan: false,
+    plan: true,
     master: false,
     admin: false
   });
@@ -107,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: TrendingUp,
       iconColor: 'text-amber-400',
       items: [
-        { id: 'dashboard', label: 'Top Management KPI', icon: LayoutDashboard, iconColor: 'text-emerald-400' },
+        { id: 'top_management', label: 'Top Management KPI', icon: LayoutDashboard, iconColor: 'text-emerald-400' },
         { id: 'dashboard', label: 'Operational Dashboard', icon: PieChart, iconColor: 'text-blue-400' }
       ]
     },
@@ -127,11 +137,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: ShieldCheck,
       iconColor: 'text-emerald-400',
       items: [
-        { id: 'wo', label: '1. Washing & Cleaning', icon: Droplets, iconColor: 'text-cyan-400' },
-        { id: 'wo', label: '2. Greasing Full Points', icon: Wrench, iconColor: 'text-amber-400' },
-        { id: 'p2h', label: '3. General Inspection', icon: ShieldCheck, iconColor: 'text-sky-400' },
-        { id: 'tools', label: '4. Pengencangan / Torque', icon: Hammer, iconColor: 'text-rose-400' },
-        { id: 'wo', label: '5. Battery & Electrical', icon: Zap, iconColor: 'text-purple-400' }
+        { id: 'pm_washing', label: '1. Washing & Cleaning', icon: Droplets, iconColor: 'text-cyan-400' },
+        { id: 'pm_greasing', label: '2. Greasing Full Points', icon: Wrench, iconColor: 'text-amber-400' },
+        { id: 'pm_inspection', label: '3. General Inspection', icon: ShieldCheck, iconColor: 'text-sky-400' },
+        { id: 'pm_torque', label: '4. Pengencangan / Torque', icon: Hammer, iconColor: 'text-rose-400' },
+        { id: 'pm_battery', label: '5. Battery & Electrical', icon: Zap, iconColor: 'text-purple-400' }
       ]
     },
     {
@@ -140,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Microscope,
       iconColor: 'text-orange-400',
       items: [
-        { id: 'fleet', label: 'Plan Component (PCR)', icon: Cpu, iconColor: 'text-orange-400' },
+        { id: 'pcr', label: 'Plan Component (PCR)', icon: Cpu, iconColor: 'text-orange-400' },
         { id: 'swab', label: 'Swab Component', icon: Repeat, iconColor: 'text-pink-400' },
         { id: 'far', label: 'Failure Analysis (FAR)', icon: AlertTriangle, iconColor: 'text-red-400' }
       ]
@@ -153,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'p2h', label: 'P2H & Inspeksi Harian', icon: ClipboardList, iconColor: 'text-cyan-300' },
         { id: 'daily_hm', label: 'Input Daily HM & Fuel', icon: Gauge, iconColor: 'text-purple-300' },
-        { id: 'meetings', label: 'Laporan Aktifitas', icon: HardHat, iconColor: 'text-amber-300' }
+        { id: 'aktifitas', label: 'Laporan Aktifitas', icon: HardHat, iconColor: 'text-amber-300' }
       ]
     },
     {
@@ -162,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Briefcase,
       iconColor: 'text-emerald-400',
       items: [
-        { id: 'meetings', label: 'Plan Budget Bulanan', icon: Wallet, iconColor: 'text-emerald-300' },
+        { id: 'monthly_budget', label: 'Plan Budget Bulanan', icon: Wallet, iconColor: 'text-emerald-300' },
         { id: 'meetings', label: 'Notulen Rapat Plant', icon: FileText, iconColor: 'text-yellow-300' }
       ]
     },
@@ -256,6 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Close Button on Mobile */}
           <button
+            type="button"
             onClick={onClose}
             className="md:hidden p-1.5 rounded-lg bg-white/10 text-white/80 hover:bg-white/20"
           >
@@ -276,11 +287,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     type="button"
                     onClick={() => toggleGroup(group.id)}
-                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-300 hover:text-white rounded-lg hover:bg-white/5 transition-colors group"
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/5 transition-colors group cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
                       <GroupIcon className={`w-3.5 h-3.5 ${group.iconColor}`} />
-                      <span>{group.label}</span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-slate-200 transition-colors">
+                        {group.label}
+                      </span>
                     </div>
                     <ChevronDown
                       className={`w-3.5 h-3.5 text-white/40 group-hover:text-white/80 transition-transform duration-200 ${
@@ -294,7 +307,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 {/* Sub Menu Items */}
                 {(!collapsed ? isGroupOpen : true) && (
-                  <div className={`mt-1 space-y-1 ${!collapsed ? 'pl-2 border-l border-white/10 ml-3' : ''}`}>
+                  <div className={`mt-1 space-y-0.5 ${!collapsed ? 'pl-2 border-l border-white/10 ml-3' : ''}`}>
                     {group.items.map((item, idx) => {
                       const ItemIcon = item.icon;
                       const isActive = !item.isExternal && currentTab === item.id;
@@ -310,8 +323,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               flex items-center rounded-xl transition-all
                               ${
                                 collapsed
-                                  ? 'w-10 h-10 mx-auto justify-center hover:bg-white/10'
-                                  : 'w-full px-3 py-2 text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 gap-2.5'
+                                  ? 'w-10 h-10 mx-auto justify-center hover:bg-white/10 text-slate-400'
+                                  : 'w-full h-10 px-3 text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 gap-2.5'
                               }
                             `}
                             title={item.label}
@@ -331,18 +344,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             onClose();
                           }}
                           className={`
-                            flex items-center rounded-xl transition-all group
+                            flex items-center rounded-xl transition-all duration-200 group cursor-pointer
                             ${
                               collapsed
                                 ? `w-10 h-10 mx-auto justify-center ${
                                     isActive
-                                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40'
-                                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/40'
+                                      : 'text-slate-400 hover:bg-white/10 hover:text-white'
                                   }`
-                                : `w-full px-3 py-2 text-xs font-bold gap-2.5 ${
+                                : `w-full h-9 px-2.5 text-xs font-semibold gap-2.5 ${
                                     isActive
-                                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                                      : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                      ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                                      : 'text-slate-400 hover:text-white hover:bg-white/5 hover:translate-x-0.5'
                                   }`
                             }
                           `}
@@ -355,13 +368,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           />
                           {!collapsed && (
                             <div className="flex-1 flex items-center justify-between min-w-0">
-                              <span className="truncate">{item.label}</span>
+                              <span className="truncate text-left">{item.label}</span>
                               {item.count !== undefined && (
                                 <span
                                   className={`ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
                                     isActive
                                       ? 'bg-white/20 text-white'
-                                      : 'bg-white/10 text-slate-300 group-hover:text-white'
+                                      : 'bg-white/10 text-slate-400 group-hover:text-white'
                                   }`}
                                 >
                                   {item.count}

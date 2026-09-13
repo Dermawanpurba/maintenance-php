@@ -319,12 +319,29 @@ class MaintenanceController extends Controller
             'inspections' => $this->mapRecords(Inspection::all()),
             'pcr' => $this->mapRecords(PcrComponent::all()),
             'pmRecords' => $this->mapRecords(PmRecord::all()),
-            'monthlyBudget' => $this->mapRecords(MonthlyBudget::all()),
+            'monthlyBudget' => MonthlyBudget::all()->map(function($b) {
+                $arr = $b->toArray();
+                $arr['id'] = $arr['item_id'] ?? $arr['id'];
+                $arr['anggaran'] = $arr['budget_plan'] ?? 0;
+                $arr['realisasi'] = $arr['actual_spent'] ?? 0;
+                $arr['selisih'] = $arr['variance'] ?? 0;
+                $arr['kategori'] = $arr['category'] ?? '';
+                $arr['keterangan'] = $arr['notes'] ?? '';
+                return $arr;
+            })->values()->all(),
             'equipmentCosts' => $this->mapRecords(EquipmentCost::all()),
             'equipmentProductivity' => [],
             'farRecords' => $this->mapRecords(FailureAnalysis::all()),
             'swabComponents' => $this->mapRecords(SwabComponent::all()),
-            'meetingNotes' => $this->mapRecords(MeetingNote::all()),
+            'meetingNotes' => MeetingNote::all()->map(function($m) {
+                $arr = $m->toArray();
+                $arr['id'] = $arr['item_id'] ?? $arr['id'];
+                $arr['title'] = $arr['topic'] ?? ($arr['title'] ?? '');
+                $arr['agenda'] = $arr['discussion_summary'] ?? ($arr['agenda'] ?? '');
+                $arr['decision'] = $arr['management_decision'] ?? ($arr['decision'] ?? '');
+                $arr['pic'] = $arr['leader'] ?? ($arr['pic'] ?? '');
+                return $arr;
+            })->values()->all(),
             'masterTools' => $this->mapRecords(MasterTool::all()),
             'userAccess' => $userAccessMap,
             'settings' => $this->getSettingsArray(),

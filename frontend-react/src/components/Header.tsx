@@ -13,15 +13,15 @@ interface HeaderProps {
 }
 
 const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> = {
-  dashboard: {
-    title: 'Executive Plant Management & Strategic KPI Hub',
-    subtitle: 'Ringkasan performa pemeliharaan armada, Physical Availability (PA), & downtime',
+  top_management: {
+    title: 'Top Management Executive KPI & Plant Overview',
+    subtitle: 'Ringkasan tingkat tinggi ketersediaan fisik armada (PA), MTBF, MTTR, dan utilisasi',
     tag: 'EXECUTIVE KPI'
   },
-  fleet: {
-    title: 'Master Unit & Monitoring Armada Alat Berat',
-    subtitle: 'Kesiapan unit alat berat, lokasi site, dan status operasional (RFU / RWN / BD)',
-    tag: 'FLEET MANAGEMENT'
+  dashboard: {
+    title: 'Operational Dashboard & Real-Time Monitoring',
+    subtitle: 'Status breakdown unit, antrean work order, dan operasional harian workshop',
+    tag: 'OPERATIONAL'
   },
   wo: {
     title: 'Work Order Hub & Surat Perintah Kerja',
@@ -33,25 +33,35 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     subtitle: 'Daftar temuan defect inspeksi, urgensi penanganan, dan antrean suku cadang',
     tag: 'DEFECT LOG'
   },
-  daily_hm: {
-    title: 'Log Hour Meter & Pemakaian Bahan Bakar',
-    subtitle: 'Pencatatan akumulasi jam operasi (HM) harian dan konsumsi solar/fuel',
-    tag: 'HOUR METER'
+  pm_washing: {
+    title: 'PM Hub: 1. Unit Washing & Undercarriage Cleaning',
+    subtitle: 'Pencucian lumpur bertekanan tinggi dan pembersihan radiator unit tambang',
+    tag: 'PREVENTIVE'
   },
-  p2h: {
-    title: 'P2H & Checklist Inspeksi Harian',
-    subtitle: 'Pemeriksaan kelayakan unit sebelum beroperasi (Pre-Start Safety Inspection)',
-    tag: 'INSPECTION'
+  pm_greasing: {
+    title: 'PM Hub: 2. Greasing Full Points & Lubrication',
+    subtitle: 'Pelumasan pin bushing, center joint, swing bearing, dan drive shaft',
+    tag: 'PREVENTIVE'
   },
-  parts: {
-    title: 'Master Sparepart & Manajemen Gudang',
-    subtitle: 'Katalog suku cadang, lokasi rak workshop, pergerakan stok, dan reorder point',
-    tag: 'WAREHOUSE'
+  pm_inspection: {
+    title: 'PM Hub: 3. General Visual Inspection & Leaks',
+    subtitle: 'Pemeriksaan kebocoran fluida, kekencangan hose, dan keretakan chassis',
+    tag: 'PREVENTIVE'
   },
-  tools: {
-    title: 'Master Perkakas & Special Tools Tracker',
-    subtitle: 'Monitoring inventaris tools mekanik, status peminjaman, dan kalibrasi alat',
-    tag: 'TOOLS'
+  pm_torque: {
+    title: 'PM Hub: 4. Pengencangan Baut & Torque Check',
+    subtitle: 'Verifikasi torsi baut track shoe, final drive, dan mounting engine',
+    tag: 'PREVENTIVE'
+  },
+  pm_battery: {
+    title: 'PM Hub: 5. Battery & Electrical System',
+    subtitle: 'Pengujian alternator, motor starter, kabel grounding, dan voltase accu',
+    tag: 'PREVENTIVE'
+  },
+  pcr: {
+    title: 'Plan Component Replacement (PCR)',
+    subtitle: 'Jadwal peremajaan komponen utama (Engine, Transmission, Hydraulic Pump) terencana',
+    tag: 'RELIABILITY'
   },
   swab: {
     title: 'Swab & Kanibalisasi Komponen',
@@ -63,10 +73,45 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     subtitle: 'Laporan investigasi kegagalan teknis komponen dan evaluasi akar masalah (RCA)',
     tag: 'ANALYSIS'
   },
+  p2h: {
+    title: 'P2H & Checklist Inspeksi Harian',
+    subtitle: 'Pemeriksaan kelayakan unit sebelum beroperasi (Pre-Start Safety Inspection)',
+    tag: 'INSPECTION'
+  },
+  daily_hm: {
+    title: 'Log Hour Meter & Pemakaian Bahan Bakar',
+    subtitle: 'Pencatatan akumulasi jam operasi (HM) harian dan konsumsi solar/fuel',
+    tag: 'HOUR METER'
+  },
+  aktifitas: {
+    title: 'Aktifitas Mekanik & Logsheet Lapangan',
+    subtitle: 'Pencatatan jam kerja efektif mekanik dan progress perbaikan di pit tambang',
+    tag: 'DAILY OPS'
+  },
+  monthly_budget: {
+    title: 'Plan Budget Bulanan Plant & Requisition',
+    subtitle: 'Alokasi anggaran belanja suku cadang, pelumas, vendor machining, dan ban',
+    tag: 'PLANNING'
+  },
   meetings: {
     title: 'Notulen Rapat & Koordinasi Plant Bulanan',
     subtitle: 'Catatan hasil evaluasi mingguan, target KPI, dan instruksi manajemen plant',
     tag: 'COORDINATION'
+  },
+  fleet: {
+    title: 'Master Unit & Monitoring Armada Alat Berat',
+    subtitle: 'Kesiapan unit alat berat, lokasi site, dan status operasional (RFU / RWN / BD)',
+    tag: 'FLEET MANAGEMENT'
+  },
+  parts: {
+    title: 'Master Sparepart & Manajemen Gudang',
+    subtitle: 'Katalog suku cadang, lokasi rak workshop, pergerakan stok, dan reorder point',
+    tag: 'WAREHOUSE'
+  },
+  tools: {
+    title: 'Master Perkakas & Special Tools Tracker',
+    subtitle: 'Monitoring inventaris tools mekanik, status peminjaman, dan kalibrasi alat',
+    tag: 'TOOLS'
   },
   system: {
     title: 'System Control, Konkurensi & Pencadangan',
