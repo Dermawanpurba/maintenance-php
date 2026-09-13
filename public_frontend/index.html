@@ -14269,21 +14269,6 @@
         };
 
 
-        window.testGASApiConnection = async function () {
-            startLoading("MENGETES KONEKSI BACKEND LARAVEL...");
-            try {
-                const res = await fetchGAS("getOptimizedData");
-                endLoading();
-                if (res && res.success) {
-                    Swal.fire('Koneksi Berhasil!', `Backend Laravel 13 (SQLite) terhubung normal. Total WO: ${(res.wo || []).length}, Total Unit: ${(res.equip || []).length}`, 'success');
-                } else {
-                    Swal.fire('Respon Gagal', (res && res.message) || 'Backend tidak mengembalikan data success.', 'error');
-                }
-            } catch (err) {
-                endLoading();
-                Swal.fire('Koneksi Gagal', err.toString(), 'error');
-            }
-        };
 
         // ==========================================
         // INSPECTION MODULE & CHECKLIST

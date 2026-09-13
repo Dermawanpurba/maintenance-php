@@ -345,8 +345,13 @@ class MaintenanceController extends Controller
     }
 
     // ==================== AUTH & USERS ====================
-    public function loginUser($data)
+    public function loginUser($data = null)
     {
+        if ($data instanceof Request) {
+            $data = $data->all();
+        } elseif (is_null($data) || !is_array($data)) {
+            $data = request()->all();
+        }
         $username = trim($data['username'] ?? '');
         $password = trim($data['password'] ?? '');
 
