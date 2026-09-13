@@ -12,6 +12,7 @@ export interface Equipment {
   serial_number?: string;
   brand?: string;
   warranty_status?: string;
+  keterangan?: string;
 }
 
 export interface WorkOrder {
@@ -44,6 +45,8 @@ export interface WorkOrder {
   mekanik?: string;
   catatan?: string;
   parts?: any[];
+  total_downtime?: number | string;
+  downtime_hours?: number | string;
 }
 
 export interface Backlog {
@@ -55,6 +58,7 @@ export interface Backlog {
   status: string; // PENDING, ORDERED, READY, CLOSED
   part_required?: string;
   estimated_hours?: number;
+  est_hours?: number | string;
 }
 
 export interface DailyHM {

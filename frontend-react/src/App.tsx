@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
+import { TopManagementView } from './components/TopManagementView';
 import { EquipmentView } from './components/EquipmentView';
 import { WorkOrdersView } from './components/WorkOrdersView';
 import { BacklogView } from './components/BacklogView';
@@ -145,13 +146,27 @@ export const App: React.FC = () => {
               </div>
             ) : (
               <>
-                {(currentTab === 'dashboard' || currentTab === 'top_management') && (
+                {currentTab === 'top_management' && (
+                  <TopManagementView
+                    equipments={equipments}
+                    workOrders={workOrders}
+                    backlogs={backlogs}
+                    dailyHms={dailyHms}
+                    meetingNotes={meetingNotes}
+                    onNavigate={tab => setCurrentTab(tab)}
+                    onRefresh={loadData}
+                  />
+                )}
+                {currentTab === 'dashboard' && (
                   <DashboardView
                     equipments={equipments}
                     workOrders={workOrders}
                     backlogs={backlogs}
                     dailyHms={dailyHms}
+                    planAlats={planAlats}
+                    planServices={planServices}
                     onNavigate={tab => setCurrentTab(tab)}
+                    onRefresh={loadData}
                   />
                 )}
                 {currentTab === 'monthly_budget' && (
