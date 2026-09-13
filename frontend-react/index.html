@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#020617" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- 1. Primary Title & Search Engine Meta Tags -->
+    <title>WOSys ERP — Sistem Manajemen Pemeliharaan & Alat Berat Terpadu</title>
+    <meta name="title" content="WOSys ERP — Sistem Manajemen Pemeliharaan & Alat Berat Terpadu" />
+    <meta name="description" content="WOSys ERP adalah platform enterprise manajemen pemeliharaan armada alat berat, pelacakan Work Order, inspeksi P2H, log Hour Meter, dan kontrol inventaris terpadu." />
+    <meta name="keywords" content="wosys erp, manajemen maintenance, sistem alat berat, work order management, p2h inspeksi, preventive maintenance erp" />
+    <meta name="author" content="WOSys Plant & Maintenance Division" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="/" />
+
+    <!-- 2. Open Graph / Facebook / WhatsApp Preview -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="/" />
+    <meta property="og:site_name" content="WOSys ERP" />
+    <meta property="og:title" content="WOSys ERP — Enterprise Maintenance Management System" />
+    <meta property="og:description" content="Monitoring armada unit, kelola Surat Perintah Kerja (WO), backlog defect, dan suku cadang secara realtime." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:locale" content="id_ID" />
+
+    <!-- 3. Twitter / X Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="/" />
+    <meta name="twitter:title" content="WOSys ERP — Maintenance & Fleet Management" />
+    <meta name="twitter:description" content="Solusi terintegrasi pemeliharaan alat berat, work orders, dan audit log." />
+    <meta name="twitter:image" content="/og-image.png" />
+
+    <!-- 4. Schema.org JSON-LD (Brand Entity Recognition) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "/#organization",
+          "name": "WOSys ERP Maintenance",
+          "alternateName": "WOSys Plant System",
+          "url": "/",
+          "logo": "/favicon.ico",
+          "description": "Enterprise Heavy Equipment & Plant Maintenance Management System."
+        },
+        {
+          "@type": "WebSite",
+          "@id": "/#website",
+          "url": "/",
+          "name": "WOSys ERP",
+          "publisher": { "@id": "/#organization" },
+          "inLanguage": "id-ID"
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "/#webapp",
+          "url": "/",
+          "name": "WOSys ERP Application",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "All",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "IDR"
+          }
+        }
+      ]
+    }
+    </script>
+    <style>
+      body {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
+    <!-- 5. Anti-Empty-Root Fallback -->
+    <div id="root">
+      <noscript>
+        <div style="max-width: 800px; margin: 40px auto; padding: 24px; font-family: sans-serif; background: #0f172a; color: #f8fafc; border-radius: 16px;">
+          <h1>WOSys ERP — Sistem Manajemen Pemeliharaan</h1>
+          <p>Aplikasi web ini membutuhkan JavaScript untuk berjalan. Harap aktifkan JavaScript pada peramban Anda.</p>
+        </div>
+      </noscript>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
