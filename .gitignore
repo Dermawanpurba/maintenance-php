@@ -2,7 +2,6 @@
 /node_modules
 /public/hot
 /public/storage
-/public_frontend
 /storage/*.key
 /storage/logs/*.log
 /storage/app/backups/*
