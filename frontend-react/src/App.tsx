@@ -7,6 +7,7 @@ import { EquipmentView } from './components/EquipmentView';
 import { WorkOrdersView } from './components/WorkOrdersView';
 import { BacklogView } from './components/BacklogView';
 import { DailyHmView } from './components/DailyHmView';
+import { MechanicActivityView } from './components/MechanicActivityView';
 import { P2hInspectionView } from './components/P2hInspectionView';
 import { PartsStockView } from './components/PartsStockView';
 import { ToolsTrackerView } from './components/ToolsTrackerView';
@@ -24,6 +25,8 @@ import {
   WorkOrder,
   Backlog,
   DailyHM,
+  MechanicActivity,
+  MasterMekanik,
   PartItem,
   ToolItem,
   SwabRecord,
@@ -50,6 +53,8 @@ export const App: React.FC = () => {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [backlogs, setBacklogs] = useState<Backlog[]>([]);
   const [dailyHms, setDailyHms] = useState<DailyHM[]>([]);
+  const [activities, setActivities] = useState<MechanicActivity[]>([]);
+  const [mechanics, setMechanics] = useState<MasterMekanik[]>([]);
   const [parts, setParts] = useState<PartItem[]>([]);
   const [tools, setTools] = useState<ToolItem[]>([]);
   const [swabs, setSwabs] = useState<SwabRecord[]>([]);
@@ -75,6 +80,8 @@ export const App: React.FC = () => {
         setWorkOrders(data.wo || []);
         setBacklogs(data.backlog || []);
         setDailyHms(data.dailyHM || []);
+        setActivities(data.activities || []);
+        setMechanics(data.mekanikList || []);
         setParts(data.parts || []);
         setTools(data.masterTools || []);
         setSwabs(data.swabComponents || []);
@@ -212,9 +219,10 @@ export const App: React.FC = () => {
                   />
                 )}
                 {currentTab === 'aktifitas' && (
-                  <DailyHmView
-                    dailyHms={dailyHms}
-                    equipments={equipments}
+                  <MechanicActivityView
+                    activities={activities}
+                    mechanics={mechanics}
+                    workOrders={workOrders}
                     onRefresh={loadData}
                   />
                 )}

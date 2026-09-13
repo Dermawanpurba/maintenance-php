@@ -322,12 +322,31 @@ class MaintenanceController extends Controller
             'stock' => $this->mapRecords(Stock::all()),
             'planAlat' => $planAlat,
             'planService' => $this->mapRecords(PlanService::all()),
-            'dailyHM' => $this->mapRecords(DailyHm::all()),
+            'dailyHM' => DailyHm::all()->map(function($h) {
+                $arr = $h->toArray();
+                $arr['id'] = $arr['item_id'] ?? $arr['id'];
+                $arr['equip_no'] = $arr['equip_no'] ?? ($arr['no_unit'] ?? '');
+                $arr['no_unit'] = $arr['equip_no'];
+                $arr['hm_awal'] = floatval($arr['hm_awal'] ?? 0);
+                $arr['hm_akhir'] = floatval($arr['hm_akhir'] ?? 0);
+                $arr['total_hm'] = floatval($arr['total_hm'] ?? max(0, $arr['hm_akhir'] - $arr['hm_awal']));
+                return $arr;
+            })->values()->all(),
             'components' => $this->mapRecords(MasterComponent::all()),
             'usersData' => $this->mapRecords(User::all()),
-            'mekanikList' => $this->mapRecords(MasterMekanik::all()),
+            'mekanikList' => MasterMekanik::all()->map(function($m) {
+                $arr = $m->toArray();
+                $arr['id'] = $arr['item_id'] ?? $arr['id'];
+                $arr['nama'] = $arr['nama_mekanik'] ?? ($arr['nama'] ?? ($arr['name'] ?? ''));
+                $arr['nama_mekanik'] = $arr['nama'];
+                return $arr;
+            })->values()->all(),
             'pelaporList' => $this->mapRecords(MasterPelapor::all()),
-            'activities' => $this->mapRecords(MechanicActivity::all()),
+            'activities' => MechanicActivity::all()->map(function($a) {
+                $arr = $a->toArray();
+                $arr['id'] = $arr['item_id'] ?? $arr['id'];
+                return $arr;
+            })->values()->all(),
             'wo' => $this->mapRecords(WorkOrder::all()),
             'backlog' => Backlog::all()->map(function($b) {
                 $arr = $b->toArray();
@@ -608,13 +627,18 @@ class MaintenanceController extends Controller
     public function saveDailyHM($data)
     {
         $id = $data['id'] ?? $data['item_id'] ?? ('HM-' . time());
+        $equip_no = $data['equip_no'] ?? ($data['no_unit'] ?? '');
+        $hm_awal = floatval($data['hm_awal'] ?? 0);
+        $hm_akhir = floatval($data['hm_akhir'] ?? 0);
+        $total_hm = floatval($data['total_hm'] ?? max(0, $hm_akhir - $hm_awal));
+
         $fields = [
             'item_id' => $id,
             'tanggal' => $data['tanggal'] ?? date('Y-m-d'),
-            'equip_no' => $data['equip_no'] ?? '',
-            'hm_awal' => $data['hm_awal'] ?? 0,
-            'hm_akhir' => $data['hm_akhir'] ?? 0,
-            'total_hm' => $data['total_hm'] ?? 0,
+            'equip_no' => $equip_no,
+            'hm_awal' => $hm_awal,
+            'hm_akhir' => $hm_akhir,
+            'total_hm' => $total_hm,
             'timestamp' => now()->format('Y-m-d H:i:s')
         ];
 
@@ -624,7 +648,7 @@ class MaintenanceController extends Controller
 
     public function deleteDailyHM($data)
     {
-        $id = is_array($data) ? ($data['id'] ?? '') : $data;
+        $id = is_array($data) ? ($data['id'] ?? ($data['item_id'] ?? '')) : $data;
         DailyHm::where('item_id', $id)->orWhere('id', $id)->delete();
         return ['success' => true, 'message' => 'Daily HM berhasil dihapus'];
     }
@@ -632,12 +656,17 @@ class MaintenanceController extends Controller
     // ==================== ACTIVITIES ====================
     public function saveActivityLog($data)
     {
-        $id = $data['id'] ?? $data['item_id'] ?? ('ACT-' . time());
+        $id = $data['id'] ?? $data['item_id'] ?? ('ACT-' . time() . '-' . rand(100, 999));
+        $mekanik = $data['mekanik'] ?? '';
+        if (is_array($mekanik)) {
+            $mekanik = implode(', ', $mekanik);
+        }
+
         $fields = [
             'item_id' => $id,
             'tanggal' => $data['tanggal'] ?? date('Y-m-d'),
             'no_wo' => $data['no_wo'] ?? '',
-            'mekanik' => $data['mekanik'] ?? '',
+            'mekanik' => $mekanik,
             'aktifitas' => $data['aktifitas'] ?? '',
             'jam_mulai' => $data['jam_mulai'] ?? '',
             'jam_selesai' => $data['jam_selesai'] ?? ''
@@ -649,7 +678,7 @@ class MaintenanceController extends Controller
 
     public function deleteActivity($data)
     {
-        $id = is_array($data) ? ($data['id'] ?? '') : $data;
+        $id = is_array($data) ? ($data['id'] ?? ($data['item_id'] ?? '')) : $data;
         MechanicActivity::where('item_id', $id)->orWhere('id', $id)->delete();
         return ['success' => true, 'message' => 'Aktivitas berhasil dihapus'];
     }

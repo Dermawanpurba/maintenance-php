@@ -68,15 +68,39 @@ export interface Backlog {
 
 export interface DailyHM {
   id?: number | string;
+  item_id?: string;
   tanggal: string;
-  no_unit: string;
+  equip_no?: string;
+  no_unit?: string;
   hm_awal: number;
   hm_akhir: number;
   total_hm?: number;
   fuel_liter?: number;
   operator?: string;
   shift?: string;
+  deviasi?: number | null;
 }
+
+export interface MechanicActivity {
+  id?: number | string;
+  item_id?: string;
+  tanggal?: string;
+  no_wo?: string;
+  mekanik?: string;
+  aktifitas?: string;
+  jam_mulai?: string;
+  jam_selesai?: string;
+  created_at?: string;
+}
+
+export interface MasterMekanik {
+  id?: number | string;
+  item_id?: string;
+  nama?: string;
+  nama_mekanik?: string;
+  status?: string;
+}
+
 
 export interface PartItem {
   id?: number | string;
