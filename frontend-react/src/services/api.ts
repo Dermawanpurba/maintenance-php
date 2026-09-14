@@ -209,5 +209,68 @@ export const api = {
   // ==================== SYSTEM AUDIT LOGS ====================
   async getSystemLogs() {
     return this.postAction('getSystemLogs');
+  },
+
+  // ==================== USERS & ACCESS CONTROL ====================
+  async getUsersList() {
+    return this.postAction('getUsersList');
+  },
+
+  async saveUser(data: any) {
+    return this.postAction('saveUser', data);
+  },
+
+  async approveUser(data: { username: string; status?: string; role?: string }) {
+    return this.postAction('approveUser', data);
+  },
+
+  async deleteUser(username: string) {
+    return this.postAction('deleteUser', { username });
+  },
+
+  async getUserAccess(username: string) {
+    return this.postAction('getUserAccess', { username });
+  },
+
+  async saveUserAccess(data: { username: string; feature: string }) {
+    return this.postAction('saveUserAccess', data);
+  },
+
+  async deleteUserAccess(id: string | number) {
+    return this.postAction('deleteUserAccess', { id });
+  },
+
+  // ==================== MASTER CREW & COMPONENTS ====================
+  async saveMekanik(data: any) {
+    return this.postAction('saveMekanik', data);
+  },
+
+  async deleteMekanik(id: string | number) {
+    return this.postAction('deleteMekanik', { id, nama_mekanik: id });
+  },
+
+  async savePelapor(data: any) {
+    return this.postAction('savePelapor', data);
+  },
+
+  async deletePelapor(id: string | number) {
+    return this.postAction('deletePelapor', { id });
+  },
+
+  async saveMasterComponent(data: any) {
+    return this.postAction('saveMaster', { type: 'component', data });
+  },
+
+  async deleteMasterComponent(id: string | number) {
+    return this.postAction('deleteMasterComponent', { id });
+  },
+
+  // ==================== SETTINGS ====================
+  async getSettings() {
+    return this.postAction('getSettings');
+  },
+
+  async saveSettings(data: any) {
+    return this.postAction('saveSettings', data);
   }
 };

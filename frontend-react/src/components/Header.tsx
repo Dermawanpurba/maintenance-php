@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, RefreshCw, Download, Shield, ExternalLink, Activity } from 'lucide-react';
+import { Menu, RefreshCw, Download, Shield, ExternalLink, Activity, AlertTriangle, Printer } from 'lucide-react';
 import { NavTab } from './Sidebar';
 
 interface HeaderProps {
@@ -10,6 +10,8 @@ interface HeaderProps {
   onRefresh: () => void;
   refreshing: boolean;
   onBackup: () => void;
+  onOpenBDAwal?: () => void;
+  onPrintExecSummary?: () => void;
 }
 
 const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> = {
@@ -22,6 +24,11 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     title: 'Operational Dashboard & Real-Time Monitoring',
     subtitle: 'Status breakdown unit, antrean work order, dan operasional harian workshop',
     tag: 'OPERATIONAL'
+  },
+  database_3d: {
+    title: 'Relasi Database 3D & Arsitektur Menu ERP',
+    subtitle: 'Visualisasi 3D interaktif yang menggambarkan hubungan relasi antar 24 tabel data operasional',
+    tag: 'KNOWLEDGE GRAPH'
   },
   wo: {
     title: 'Work Order Hub & Surat Perintah Kerja',
@@ -113,6 +120,21 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     subtitle: 'Monitoring inventaris tools mekanik, status peminjaman, dan kalibrasi alat',
     tag: 'TOOLS'
   },
+  master_crew: {
+    title: 'Master Crew Teknisi & Struktur Komponen',
+    subtitle: 'Manajemen personil mekanik, pelapor kerusakan pit, dan hierarki komponen',
+    tag: 'CREW & COMPONENT'
+  },
+  manage_users: {
+    title: 'Kelola Pengguna & Hak Akses Fitur',
+    subtitle: 'Persetujuan pendaftaran user baru, penugasan role, dan izin keamanan',
+    tag: 'ACCESS CONTROL'
+  },
+  settings: {
+    title: 'Pengaturan Sistem ERP & Parameter Site',
+    subtitle: 'Konfigurasi identitas site tambang, interval refresh, dan pemeliharaan',
+    tag: 'SETTINGS'
+  },
   system: {
     title: 'System Control, Konkurensi & Pencadangan',
     subtitle: 'Monitoring database SQLite WAL lokal, audit trail, dan arsip data .ZIP 1-klik',
@@ -127,7 +149,9 @@ export const Header: React.FC<HeaderProps> = ({
   latency,
   onRefresh,
   refreshing,
-  onBackup
+  onBackup,
+  onOpenBDAwal,
+  onPrintExecSummary
 }) => {
   const current = titles[currentTab] || {
     title: 'WOSys ERP Management',
@@ -189,6 +213,32 @@ export const Header: React.FC<HeaderProps> = ({
             className={`w-4 h-4 ${refreshing ? 'animate-spin text-blue-600' : ''}`}
           />
         </button>
+
+        {/* Quick Breakdown Reporting Button */}
+        {onOpenBDAwal && (
+          <button
+            onClick={onOpenBDAwal}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-xs font-black shadow-sm transition-all hover:shadow-md active:scale-95 animate-pulse"
+            title="Lapor Breakdown Awal Unit (Emergency B/D)"
+            type="button"
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Lapor BD Awal</span>
+          </button>
+        )}
+
+        {/* Print Executive Summary */}
+        {onPrintExecSummary && (
+          <button
+            onClick={onPrintExecSummary}
+            className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 transition-colors"
+            title="Cetak Resume Eksekutif (Print / PDF)"
+            type="button"
+          >
+            <Printer className="w-3.5 h-3.5 text-blue-600" />
+            <span>Cetak Resume</span>
+          </button>
+        )}
 
         {/* 1-Click Backup */}
         <button

@@ -19,6 +19,12 @@ import { PcrView } from './components/PcrView';
 import { PreventiveMaintenanceView } from './components/PreventiveMaintenanceView';
 import { SystemHealthView } from './components/SystemHealthView';
 import { MobileLiquidDock } from './components/MobileLiquidDock';
+import { Database3dView } from './components/Database3dView';
+import { ManageUsersView } from './components/ManageUsersView';
+import { MasterCrewCompView } from './components/MasterCrewCompView';
+import { QuickBDAwalModal } from './components/QuickBDAwalModal';
+import { SettingsView } from './components/SettingsView';
+import { printExecutiveReport } from './utils/printUtils';
 import { api } from './services/api';
 import {
   Equipment,
@@ -36,7 +42,10 @@ import {
   PcrItem,
   PlanAlat,
   PlanService,
-  SystemLogItem
+  SystemLogItem,
+  MasterPelapor,
+  MasterComponentItem,
+  SettingsData
 } from './types';
 import { RefreshCw } from 'lucide-react';
 
@@ -65,6 +74,10 @@ export const App: React.FC = () => {
   const [planAlats, setPlanAlats] = useState<PlanAlat[]>([]);
   const [planServices, setPlanServices] = useState<PlanService[]>([]);
   const [systemLogs, setSystemLogs] = useState<SystemLogItem[]>([]);
+  const [pelapors, setPelapors] = useState<MasterPelapor[]>([]);
+  const [components, setComponents] = useState<MasterComponentItem[]>([]);
+  const [settings, setSettings] = useState<SettingsData>({});
+  const [isBDAwalModalOpen, setIsBDAwalModalOpen] = useState(false);
 
   const loadData = async () => {
     const startTime = performance.now();
@@ -92,6 +105,9 @@ export const App: React.FC = () => {
         setPlanAlats(data.planAlat || []);
         setPlanServices(data.planService || []);
         setSystemLogs(data.systemLogs || []);
+        setPelapors(data.pelaporList || []);
+        setComponents(data.components || []);
+        setSettings(data.settings || {});
       }
     } catch (err) {
       console.error('Failed to fetch data from API:', err);
@@ -110,6 +126,43 @@ export const App: React.FC = () => {
 
   const handleBackup = () => {
     api.triggerBackupDownload();
+  };
+
+  const handlePrintExecReport = () => {
+    const totalUnits = equipments.length || 1;
+    let rfu = 0;
+    let rwn = 0;
+    let bd = 0;
+
+    equipments.forEach(eq => {
+      const s = (eq.status || '').toUpperCase();
+      if (s === 'READY' || s === 'RUNNING' || s === 'ACTIVE' || s === 'RFU' || s === 'OPERASI') {
+        rfu++;
+      } else if (s === 'RWN' || s.includes('NOTE')) {
+        rwn++;
+      } else {
+        bd++;
+      }
+    });
+
+    const pa = Math.round(((rfu + rwn) / totalUnits) * 100);
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const end = now.toISOString().split('T')[0];
+
+    printExecutiveReport(
+      {
+        pa,
+        rfu,
+        rwn,
+        bd,
+        totalHours: 720 * totalUnits,
+        downtimeHours: bd * 24
+      },
+      equipments,
+      workOrders,
+      { start, end }
+    );
   };
 
   return (
@@ -139,6 +192,8 @@ export const App: React.FC = () => {
           onRefresh={loadData}
           refreshing={refreshing}
           onBackup={handleBackup}
+          onOpenBDAwal={() => setIsBDAwalModalOpen(true)}
+          onPrintExecSummary={handlePrintExecReport}
         />
 
         {/* Viewport Scroll Container */}
@@ -174,6 +229,17 @@ export const App: React.FC = () => {
                     planServices={planServices}
                     onNavigate={tab => setCurrentTab(tab)}
                     onRefresh={loadData}
+                  />
+                )}
+                {currentTab === 'database_3d' && (
+                  <Database3dView
+                    equipments={equipments}
+                    workOrders={workOrders}
+                    backlogs={backlogs}
+                    dailyHms={dailyHms}
+                    parts={parts}
+                    tools={tools}
+                    onNavigate={tab => setCurrentTab(tab)}
                   />
                 )}
                 {currentTab === 'monthly_budget' && (
@@ -235,6 +301,14 @@ export const App: React.FC = () => {
                 {currentTab === 'tools' && (
                   <ToolsTrackerView tools={tools} onRefresh={loadData} />
                 )}
+                {currentTab === 'master_crew' && (
+                  <MasterCrewCompView
+                    mechanics={mechanics}
+                    pelapors={pelapors}
+                    components={components}
+                    onRefresh={loadData}
+                  />
+                )}
                 {currentTab === 'swab' && (
                   <SwabView swabs={swabs} equipments={equipments} onRefresh={loadData} />
                 )}
@@ -243,6 +317,12 @@ export const App: React.FC = () => {
                 )}
                 {currentTab === 'meetings' && (
                   <MeetingNotesView notes={meetingNotes} onRefresh={loadData} />
+                )}
+                {currentTab === 'manage_users' && (
+                  <ManageUsersView onRefresh={loadData} />
+                )}
+                {currentTab === 'settings' && (
+                  <SettingsView initialSettings={settings} onRefresh={loadData} />
                 )}
                 {currentTab === 'system' && (
                   <SystemHealthView
@@ -275,6 +355,16 @@ export const App: React.FC = () => {
         <MobileLiquidDock
           currentTab={currentTab}
           onSelectTab={tab => setCurrentTab(tab)}
+        />
+
+        {/* Quick Breakdown Reporting Modal */}
+        <QuickBDAwalModal
+          isOpen={isBDAwalModalOpen}
+          onClose={() => setIsBDAwalModalOpen(false)}
+          equipments={equipments}
+          onSuccess={() => {
+            loadData();
+          }}
         />
       </div>
     </div>

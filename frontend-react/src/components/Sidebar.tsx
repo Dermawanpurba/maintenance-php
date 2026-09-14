@@ -27,12 +27,16 @@ import {
   HardDrive,
   ChevronDown,
   ChevronLeft,
-  X
+  X,
+  Boxes,
+  UserCheck,
+  Users
 } from 'lucide-react';
 
 export type NavTab =
   | 'top_management'
   | 'dashboard'
+  | 'database_3d'
   | 'wo'
   | 'backlog'
   | 'pm_washing'
@@ -51,6 +55,9 @@ export type NavTab =
   | 'fleet'
   | 'parts'
   | 'tools'
+  | 'master_crew'
+  | 'manage_users'
+  | 'settings'
   | 'system';
 
 interface SidebarProps {
@@ -118,7 +125,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       iconColor: 'text-amber-400',
       items: [
         { id: 'top_management', label: 'Top Management KPI', icon: LayoutDashboard, iconColor: 'text-emerald-400' },
-        { id: 'dashboard', label: 'Operational Dashboard', icon: PieChart, iconColor: 'text-blue-400' }
+        { id: 'dashboard', label: 'Operational Dashboard', icon: PieChart, iconColor: 'text-blue-400' },
+        { id: 'database_3d', label: 'Relasi Database 3D', icon: Boxes, iconColor: 'text-cyan-400' }
       ]
     },
     {
@@ -184,7 +192,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'fleet', label: 'Master Unit & Plan', icon: Truck, iconColor: 'text-indigo-400', count: counts.equip },
         { id: 'parts', label: 'Master Part & Stock', icon: Package, iconColor: 'text-amber-400', count: counts.parts },
-        { id: 'tools', label: 'Master Tool & Workshop', icon: Hammer, iconColor: 'text-orange-400' }
+        { id: 'tools', label: 'Master Tool & Workshop', icon: Hammer, iconColor: 'text-orange-400' },
+        { id: 'master_crew', label: 'Master Crew & Komponen', icon: Users, iconColor: 'text-teal-400' }
       ]
     },
     {
@@ -193,6 +202,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Settings,
       iconColor: 'text-rose-400',
       items: [
+        { id: 'manage_users', label: 'Kelola User & Akses', icon: UserCheck, iconColor: 'text-purple-400' },
+        { id: 'settings', label: 'Pengaturan Sistem', icon: Settings, iconColor: 'text-amber-400' },
         {
           id: 'admin_redirect',
           label: 'Filament Admin Panel',

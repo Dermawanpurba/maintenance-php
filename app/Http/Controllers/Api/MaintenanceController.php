@@ -81,7 +81,8 @@ class MaintenanceController extends Controller
                     return response()->json($this->saveSettings($data));
 
                 case 'getUsersList':
-                    return response()->json(['success' => true, 'users' => User::all()]);
+                    $allUsers = User::all();
+                    return response()->json(['success' => true, 'users' => $allUsers, 'data' => $allUsers]);
 
                 case 'saveUser':
                     return response()->json($this->saveUser($data));
@@ -787,7 +788,10 @@ class MaintenanceController extends Controller
                 break;
             case 'MasterComponent':
             case 'component':
-                MasterComponent::create($payload);
+                MasterComponent::create([
+                    'major_component' => $payload['major_component'] ?? '',
+                    'minor_component' => $payload['minor_component'] ?? ''
+                ]);
                 break;
             default:
                 return ['success' => false, 'message' => "Tipe master {$type} tidak dikenali"];

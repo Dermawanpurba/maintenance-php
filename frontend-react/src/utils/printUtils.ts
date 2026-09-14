@@ -322,3 +322,5 @@ export function printExecutiveReport(
   printWindow.document.write(html);
   printWindow.document.close();
 }
+
+export const printExecutiveSummary = printExecutiveReport;

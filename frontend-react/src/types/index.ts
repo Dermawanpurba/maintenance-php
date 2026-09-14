@@ -236,3 +236,48 @@ export interface PlanService {
   next_service_hm?: string | number;
   kategori?: string;
 }
+
+export interface AppUser {
+  id?: number | string;
+  username: string;
+  nama?: string;
+  name?: string;
+  role: string;
+  status: string; // ACTIVE, PENDING, REJECTED
+  password?: string;
+  email?: string;
+  created_at?: string;
+}
+
+export interface UserAccessItem {
+  id?: number | string;
+  username: string;
+  feature: string;
+}
+
+export interface MasterPelapor {
+  id?: number | string;
+  item_id?: string;
+  nama?: string;
+  nama_pelapor?: string;
+  jabatan?: string;
+  departemen?: string;
+}
+
+export interface MasterComponentItem {
+  id?: number | string;
+  item_id?: string;
+  major_component: string;
+  minor_component: string;
+  standard_lifetime_hm?: number;
+}
+
+export interface SettingsData {
+  site_name?: string;
+  company_name?: string;
+  default_shift?: string;
+  auto_refresh_seconds?: number;
+  theme?: string;
+  wa_gateway?: string;
+  [key: string]: any;
+}
