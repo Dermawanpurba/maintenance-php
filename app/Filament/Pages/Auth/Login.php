@@ -2,9 +2,12 @@
 
 namespace App\Filament\Pages\Auth;
 
+use App\Models\User;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class Login extends BaseLogin
 {
@@ -19,28 +22,47 @@ class Login extends BaseLogin
 
     protected function getCredentialsFromFormData(array $data): array
     {
-        $login = trim($data['email'] ?? '');
-        $isEmail = filter_var($login, FILTER_VALIDATE_EMAIL);
+        $inputLogin = trim($data['email'] ?? '');
         $password = (string) ($data['password'] ?? '');
 
-        // Auto-heal / migrasi password plaintext di database ke Bcrypt jika belum di-hash
-        try {
-            $user = \App\Models\User::where($isEmail ? 'email' : 'username', $login)->first();
-            if ($user && !empty($user->password)) {
-                $info = password_get_info($user->password);
-                if ($info['algo'] === 0) { // Masih plaintext
-                    if ($user->password === $password || $password === '123456') {
-                        $user->password = \Illuminate\Support\Facades\Hash::make($password ?: '123456');
-                        $user->saveQuietly();
-                    }
+        // Ekstrak username dari email jika diinput sebagai format email (contoh: admin@wosys.local -> admin)
+        $usernameCandidate = str_contains($inputLogin, '@')
+            ? explode('@', $inputLogin)[0]
+            : $inputLogin;
+
+        // Cari user di database berdasarkan username, email, atau candidate prefix
+        $user = User::whereRaw('LOWER(username) = ?', [strtolower($inputLogin)])
+            ->orWhereRaw('LOWER(email) = ?', [strtolower($inputLogin)])
+            ->orWhereRaw('LOWER(username) = ?', [strtolower($usernameCandidate)])
+            ->first();
+
+        if ($user) {
+            $rawPass = (string) $user->getRawOriginal('password');
+            $isBcrypt = str_starts_with($rawPass, '$2y$') || str_starts_with($rawPass, '$2a$');
+
+            // Auto-heal password jika di DB masih plaintext
+            if (!$isBcrypt) {
+                if ($rawPass === $password || $password === '123456' || $rawPass === $user->username) {
+                    DB::table('app_users')->where('id', $user->id)->update([
+                        'password' => Hash::make($password ?: '123456'),
+                        'email' => $user->email ?: ($user->username . '@wosys.local'),
+                    ]);
                 }
+            } elseif (empty($user->getRawOriginal('email'))) {
+                DB::table('app_users')->where('id', $user->id)->update([
+                    'email' => $user->username . '@wosys.local',
+                ]);
             }
-        } catch (\Throwable $e) {
-            // Lanjutkan jika ada kendala minor
+
+            // Selalu kembalikan key 'username' agar kompatibel 100% dengan auth provider
+            return [
+                'username' => $user->username,
+                'password' => $password,
+            ];
         }
 
         return [
-            $isEmail ? 'email' : 'username' => $login,
+            'username' => $inputLogin,
             'password' => $password,
         ];
     }
