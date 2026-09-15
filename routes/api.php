@@ -13,7 +13,23 @@ Route::prefix('maintenance')->group(function () {
     Route::post('/', [MaintenanceController::class, 'router']);
 
     // 2. Direct REST Endpoints
-    Route::get('/ping', fn () => response()->json(['success' => true, 'message' => 'API OK', 'version' => 'maintenance-v1-laravel13']));
+    Route::get('/ping', fn () => response()->json([
+        'success' => true,
+        'message' => 'API OK',
+        'version' => 'maintenance-v1-laravel13',
+        'commit' => 'diagnostic-v1',
+        'server_time' => now()->toIso8601String(),
+    ]));
+    Route::get('/diagnostic-log', function () {
+        $logFile = storage_path('logs/laravel.log');
+        $log = file_exists($logFile) ? file_get_contents($logFile) : 'No log file';
+        $tail = substr($log, -4000);
+        $users = \App\Models\User::all(['id', 'username', 'email', 'role', 'status'])->toArray();
+        return response()->json([
+            'log_tail' => $tail,
+            'users' => $users,
+        ]);
+    });
     Route::get('/optimized-data', [MaintenanceController::class, 'getOptimizedData']);
     Route::post('/login', [MaintenanceController::class, 'loginUser']);
     
