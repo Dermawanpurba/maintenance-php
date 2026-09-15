@@ -67,16 +67,18 @@ else
     echo "APP_KEY=$APP_KEY" >> /var/www/html/.env
 fi
 
-# 5. Jalankan migrasi database
-echo "[5/9] Menjalankan database migrations..."
+# 5. Jalankan migrasi database & pastikan skema SQLite lengkap
+echo "[5/9] Menjalankan database migrations & sinkronisasi skema..."
+sqlite3 "$SQLITE_DB" "ALTER TABLE app_users ADD COLUMN email TEXT;" 2>/dev/null || true
+sqlite3 "$SQLITE_DB" "UPDATE app_users SET email = username || '@wosys.local' WHERE email IS NULL OR email = '';" 2>/dev/null || true
 php artisan migrate --force || true
 
 # 6. Jalankan seeder master data jika database baru / belum ada data
 echo "[6/9] Memeriksa status seeding database..."
 php artisan db:seed --force || true
 
-# Pastikan seluruh user di database terenkripsi bcrypt (agar kompatibel penuh dengan Filament Auth)
-php -r "require 'vendor/autoload.php'; \$app = require_once 'bootstrap/app.php'; \$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); foreach(App\Models\User::all() as \$u) { if(password_get_info(\$u->password)['algo'] === 0) { \$u->password = Illuminate\Support\Facades\Hash::make(\$u->password ?: '123456'); \$u->saveQuietly(); } }" || true
+# Pastikan seluruh user di database terenkripsi bcrypt dan email terisi lengkap
+php -r "require 'vendor/autoload.php'; \$app = require_once 'bootstrap/app.php'; \$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); foreach(App\Models\User::all() as \$u) { \$pass = (string)\$u->getRawOriginal('password'); if(!str_starts_with(\$pass, '\$2y\$') && !str_starts_with(\$pass, '\$2a\$')) { Illuminate\Support\Facades\DB::table('app_users')->where('id', \$u->id)->update(['password' => Illuminate\Support\Facades\Hash::make(\$pass ?: '123456')]); } if(empty(\$u->getRawOriginal('email'))) { Illuminate\Support\Facades\DB::table('app_users')->where('id', \$u->id)->update(['email' => \$u->username . '@wosys.local']); } }" || true
 
 # 7. Optimasi FilamentPHP Admin Panel
 echo "[7/9] Mengoptimasi Filament Admin Panel & menerbitkan aset..."
