@@ -11,7 +11,12 @@ class MaintenanceDatabaseSeeder extends Seeder
     {
         // Seed app_users (6 records)
         DB::table('app_users')->truncate();
-        DB::table('app_users')->insert(json_decode('[{"username": "planner", "password": "123456", "nama": "Andi Herwan", "role": "PMC", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}, {"username": "admin", "password": "123456", "nama": "Brayen", "role": "Logistic", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}, {"username": "mekanik1", "password": "123456", "nama": "Tim Mekanik KBCT", "role": "Mekanik", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}, {"username": "mekanik2", "password": "123456", "nama": "Tim Mekanik LMP", "role": "Mekanik", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}, {"username": "boss", "password": "123456", "nama": "Hariadi", "role": "GM & Mgr. Maintenance", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}, {"username": "direksi", "password": "123456", "nama": "M. Nur Salam", "role": "Direksi", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}]', true));
+        $defaultPassword = \Illuminate\Support\Facades\Hash::make('123456');
+        $rawUsers = json_decode('[{"username": "planner", "nama": "Andi Herwan", "role": "PMC", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}, {"username": "admin", "nama": "Brayen", "role": "Logistic", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}, {"username": "mekanik1", "nama": "Tim Mekanik KBCT", "role": "Mekanik", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}, {"username": "mekanik2", "nama": "Tim Mekanik LMP", "role": "Mekanik", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}, {"username": "boss", "nama": "Hariadi", "role": "GM & Mgr. Maintenance", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}, {"username": "direksi", "nama": "M. Nur Salam", "role": "Direksi", "status": "ACTIVE", "created_at": "2026-09-13 08:00:00", "updated_at": "2026-09-13 08:00:00"}]', true);
+        foreach ($rawUsers as &$u) {
+            $u['password'] = $defaultPassword;
+        }
+        DB::table('app_users')->insert($rawUsers);
 
         // Seed user_access (124 records)
         DB::table('user_access')->truncate();

@@ -75,6 +75,9 @@ php artisan migrate --force || true
 echo "[6/9] Memeriksa status seeding database..."
 php artisan db:seed --force || true
 
+# Pastikan seluruh user di database terenkripsi bcrypt (agar kompatibel penuh dengan Filament Auth)
+php -r "require 'vendor/autoload.php'; \$app = require_once 'bootstrap/app.php'; \$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); foreach(App\Models\User::all() as \$u) { if(password_get_info(\$u->password)['algo'] === 0) { \$u->password = Illuminate\Support\Facades\Hash::make(\$u->password ?: '123456'); \$u->saveQuietly(); } }" || true
+
 # 7. Optimasi FilamentPHP Admin Panel
 echo "[7/9] Mengoptimasi Filament Admin Panel & menerbitkan aset..."
 php artisan filament:optimize || true
