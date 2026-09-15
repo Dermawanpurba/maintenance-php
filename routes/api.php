@@ -22,11 +22,13 @@ Route::prefix('maintenance')->group(function () {
     ]));
     Route::get('/diagnostic-log', function () {
         $logFile = storage_path('logs/laravel.log');
-        $log = file_exists($logFile) ? file_get_contents($logFile) : 'No log file';
-        $tail = substr($log, -4000);
+        $lines = file_exists($logFile) ? file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : [];
+        $errorLines = array_values(array_filter($lines, fn ($l) => str_contains($l, '.ERROR:')));
+        $lastErrors = array_slice($errorLines, -10);
         $users = \App\Models\User::all(['id', 'username', 'email', 'role', 'status'])->toArray();
         return response()->json([
-            'log_tail' => $tail,
+            'last_errors' => $lastErrors,
+            'total_errors' => count($errorLines),
             'users' => $users,
         ]);
     });
