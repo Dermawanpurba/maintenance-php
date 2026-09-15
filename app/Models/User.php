@@ -20,6 +20,13 @@ class User extends Authenticatable implements FilamentUser
         'password',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'password' => 'hashed',
+        ];
+    }
+
     /**
      * Tentukan apakah pengguna dapat mengakses Filament Admin Panel.
      */

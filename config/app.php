@@ -97,7 +97,32 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
-    'key' => env('APP_KEY'),
+    'key' => call_user_func(function () {
+        $key = env('APP_KEY');
+        $raw = $key;
+        if (is_string($raw) && str_starts_with($raw, 'base64:')) {
+            $raw = base64_decode(substr($raw, 7), true);
+        }
+        if (is_string($raw) && strlen($raw) === 32) {
+            return $key;
+        }
+
+        // Fallback key dari file persistent di storage/app/app.key jika ada
+        $keyFile = storage_path('app/app.key');
+        if (file_exists($keyFile)) {
+            $stored = trim((string) @file_get_contents($keyFile));
+            $rawStored = str_starts_with($stored, 'base64:') ? base64_decode(substr($stored, 7), true) : $stored;
+            if (is_string($rawStored) && strlen($rawStored) === 32) {
+                return $stored;
+            }
+        }
+
+        // Otomatis hasilkan 32-byte secure key jika env kosong atau invalid
+        $newKey = 'base64:' . base64_encode(random_bytes(32));
+        @mkdir(dirname($keyFile), 0755, true);
+        @file_put_contents($keyFile, $newKey);
+        return $newKey;
+    }),
 
     'previous_keys' => [
         ...array_filter(

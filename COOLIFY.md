@@ -81,9 +81,10 @@ Buka tab **Environment Variables** di Coolify, lalu masukkan konfigurasi berikut
 # APLIKASI UTAMA
 APP_NAME="WOSys ERP"
 APP_ENV=production
-APP_KEY=base64:GENERATE_DENGAN_ARTISAN_KEY_GENERATE
+# APP_KEY wajib string 32-byte AES-256-CBC yang valid (contoh di bawah ini valid, atau generate dengan: php artisan key:generate --show)
+APP_KEY=base64:ZmymfptWGl+7fWE1018VGNnop5rXORn1BjG2VXXjzTM=
 APP_DEBUG=false
-APP_URL=https://maintenance.domainanda.com
+APP_URL=https://bss-maintenance-erp.my.id
 
 # DATABASE SQLITE LOKAL WAL MODE
 DB_CONNECTION=sqlite
@@ -99,12 +100,10 @@ QUEUE_CONNECTION=sync
 FILESYSTEM_DISK=public
 ```
 
-> [!TIP]
-> Untuk menghasilkan nilai `APP_KEY`, jalankan di terminal lokal:
-> ```bash
-> php artisan key:generate --show
-> ```
-> Salin string `base64:...` yang muncul ke variabel `APP_KEY` di atas.
+> [!IMPORTANT]
+> **Penyebab Error 500 pada Filament Admin (`/admin`)**:
+> Jika `APP_KEY` di Coolify diisi teks dummy/placeholder (misal `base64:GENERATE_...`), Laravel akan melempar error `500 Server Error (Unsupported cipher or incorrect key length)` karena enkripsi session Filament membutuhkan panjang tepat 32-byte (`AES-256-CBC`).
+> Gunakan `APP_KEY` valid di atas atau kosongkan variabel `APP_KEY` di Coolify agar sistem otomatis meng-generate kunci yang valid dan menyimpannya secara persisten.
 
 ---
 

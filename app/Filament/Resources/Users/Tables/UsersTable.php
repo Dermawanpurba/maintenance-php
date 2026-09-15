@@ -15,12 +15,37 @@ class UsersTable
     {
         return $table
             ->columns([
+                TextColumn::make('username')
+                    ->label('Username')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('nama')
+                    ->label('Nama Lengkap')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('role')
+                    ->label('Peran')
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'admin' => 'danger',
+                        'planner' => 'warning',
+                        'boss', 'direksi' => 'info',
+                        default => 'gray',
+                    }),
+
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'active' => 'success',
+                        default => 'danger',
+                    }),
+
                 TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Dibuat')
+                    ->dateTime('d M Y, H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
