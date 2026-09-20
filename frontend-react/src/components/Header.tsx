@@ -110,7 +110,7 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     tag: 'PREVENTIVE'
   },
   pcr: {
-    title: 'Plan Component Replacement (PCR)',
+    title: 'Planned Component Replacement (PCR)',
     subtitle: 'Jadwal peremajaan komponen utama (Engine, Transmission, Hydraulic Pump) terencana',
     tag: 'RELIABILITY'
   },
@@ -125,7 +125,7 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     tag: 'CONDITION MONITORING'
   },
   swab: {
-    title: 'Swab & Kanibalisasi Komponen',
+    title: 'Component Swapping & Kanibalisasi Komponen',
     subtitle: 'Dokumentasi resmi transfer komponen antar unit dengan nomor serial valid',
     tag: 'RELIABILITY'
   },
@@ -145,12 +145,12 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     tag: 'HOUR METER'
   },
   aktifitas: {
-    title: 'Aktifitas Mekanik & Logsheet Lapangan',
-    subtitle: 'Pencatatan jam kerja efektif mekanik dan progress perbaikan di pit tambang',
+    title: 'Aktivitas Mekanik & Logsheet Lapangan',
+    subtitle: 'Pencatatan jam kerja efektif mekanik dan progres perbaikan di pit tambang',
     tag: 'DAILY OPS'
   },
   monthly_budget: {
-    title: 'Plan Budget Bulanan Plant & Requisition',
+    title: 'Rencana Anggaran Bulanan Plant & Requisition',
     subtitle: 'Alokasi anggaran belanja suku cadang, pelumas, vendor machining, dan ban',
     tag: 'PLANNING'
   },
@@ -166,7 +166,7 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
   },
   fleet: {
     title: 'Master Unit & Monitoring Armada Alat Berat',
-    subtitle: 'Kesiapan unit alat berat, lokasi site, dan status operasional (RFU / RWN / BD)',
+    subtitle: 'Kesiapan unit, lokasi site, dan status operasional (RFU / RWN / B/D)',
     tag: 'FLEET MANAGEMENT'
   },
   parts: {

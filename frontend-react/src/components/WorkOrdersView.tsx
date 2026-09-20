@@ -17,6 +17,13 @@ interface PartRow {
   uom: string;
 }
 
+const normalizeBreakdownClass = (value?: string): 'BREAKDOWN SCHEDULED' | 'BREAKDOWN UNSCHEDULED' | '' => {
+  const type = String(value || '').trim().toUpperCase().replace(/[\s_-]+/g, ' ');
+  if (['UNSCH', 'UNSCHEDULED', 'BREAKDOWN UNSCHEDULED', 'BUS'].includes(type)) return 'BREAKDOWN UNSCHEDULED';
+  if (['SCH', 'SCHEDULED', 'BREAKDOWN SCHEDULED', 'BS'].includes(type) || type.startsWith('PM')) return 'BREAKDOWN SCHEDULED';
+  return '';
+};
+
 export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
   workOrders,
   equipments,
@@ -71,7 +78,7 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
     jam_rusak: new Date().toTimeString().slice(0, 5),
     tgl_selesai: '',
     jam_selesai: '',
-    sch_unsch: 'UNSCHEDULED',
+    sch_unsch: 'BREAKDOWN UNSCHEDULED',
     pm_service: 'Corrective Maintenance',
     major_comp: 'ENGINE',
     minor_comp: '',
@@ -111,7 +118,7 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
       jam_rusak: new Date().toTimeString().slice(0, 5),
       tgl_selesai: '',
       jam_selesai: '',
-      sch_unsch: 'UNSCHEDULED',
+      sch_unsch: 'BREAKDOWN UNSCHEDULED',
       pm_service: 'Corrective Maintenance',
       major_comp: 'ENGINE',
       minor_comp: '',
@@ -149,7 +156,7 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
       jam_rusak: wo.jam_rusak || '',
       tgl_selesai: wo.tgl_selesai || '',
       jam_selesai: wo.jam_selesai || '',
-      sch_unsch: wo.sch_unsch || 'UNSCHEDULED',
+      sch_unsch: normalizeBreakdownClass(wo.sch_unsch) || 'BREAKDOWN UNSCHEDULED',
       pm_service: wo.pm_service || 'Corrective Maintenance',
       major_comp: wo.major_comp || 'ENGINE',
       minor_comp: wo.minor_comp || '',
@@ -271,7 +278,7 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
 
     const s = (wo.status || 'OPEN').toUpperCase();
     const matchStatus = statusFilter === 'ALL' || s === statusFilter.toUpperCase();
-    const matchPriority = priorityFilter === 'ALL' || (wo.sch_unsch || '').toUpperCase().includes(priorityFilter.toUpperCase());
+    const matchPriority = priorityFilter === 'ALL' || normalizeBreakdownClass(wo.sch_unsch) === priorityFilter;
 
     return matchSearch && matchStatus && matchPriority;
   });
@@ -312,9 +319,9 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
             onChange={e => setPriorityFilter(e.target.value)}
             className="py-2 px-3 text-xs bg-slate-50 border border-slate-200/80 rounded-xl outline-none focus:border-blue-500 text-slate-700 font-bold transition-all hidden sm:block"
           >
-            <option value="ALL">Semua Jadwal</option>
-            <option value="SCHEDULED">SCHEDULED</option>
-            <option value="UNSCHEDULED">UNSCHEDULED</option>
+            <option value="ALL">Semua Klasifikasi</option>
+            <option value="BREAKDOWN SCHEDULED">BS — Breakdown Scheduled</option>
+            <option value="BREAKDOWN UNSCHEDULED">BUS — Breakdown Unscheduled</option>
           </select>
         </div>
 
@@ -628,14 +635,14 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-600 font-bold mb-1">Klasifikasi Servis</label>
+                  <label className="block text-slate-600 font-bold mb-1">Klasifikasi Breakdown</label>
                   <select
                     value={form.sch_unsch}
                     onChange={e => setForm({ ...form, sch_unsch: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-blue-500"
                   >
-                    <option value="UNSCHEDULED">UNSCHEDULED (Breakdown)</option>
-                    <option value="SCHEDULED">SCHEDULED (Preventive)</option>
+                    <option value="BREAKDOWN UNSCHEDULED">BUS — Breakdown Unscheduled</option>
+                    <option value="BREAKDOWN SCHEDULED">BS — Breakdown Scheduled</option>
                   </select>
                 </div>
                 <div>

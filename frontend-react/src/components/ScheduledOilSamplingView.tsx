@@ -23,12 +23,14 @@ import {
   TrendingUp,
   FileText
 } from 'lucide-react';
-import { Equipment, OilSample } from '../types';
+import { DailyHM, Equipment, OilSample, WorkOrder } from '../types';
 import { api } from '../services/api';
 
 interface ScheduledOilSamplingViewProps {
   equipments: Equipment[];
   oilSamples: OilSample[];
+  workOrders: WorkOrder[];
+  dailyHms: DailyHM[];
   onRefresh?: () => void;
   onNavigateToWO?: (unit: string, problem: string) => void;
 }
@@ -36,6 +38,8 @@ interface ScheduledOilSamplingViewProps {
 export const ScheduledOilSamplingView: React.FC<ScheduledOilSamplingViewProps> = ({
   equipments,
   oilSamples,
+  workOrders,
+  dailyHms,
   onRefresh,
   onNavigateToWO
 }) => {
@@ -121,16 +125,79 @@ export const ScheduledOilSamplingView: React.FC<ScheduledOilSamplingViewProps> =
     lab_vendor: 'Caterpillar SOS Lab'
   });
 
-  // KPI Chart Data (as depicted in the user's screenshot for EX1210)
-  // Physical Availability (%), MTBF (Hours), and BS:BUS (Breakdown Scheduled vs Unscheduled Hours)
+  // Reliability KPI bersumber dari WO dan Daily HM untuk unit yang sedang dipilih.
+  // Istilah baku: BS = Breakdown Scheduled, BUS = Breakdown Unscheduled.
   const monthlyMetrics = useMemo(() => {
-    return [
-      { month: 'Mei', pa: 45.66, paTarget: 80.0, mtbf: 9.43, mtbfTarget: 100.0, bs: 259.2, bus: 145.07 },
-      { month: 'Juni', pa: 94.07, paTarget: 80.0, mtbf: 7.0, mtbfTarget: 100.0, bs: 0, bus: 42.67 },
-      { month: 'Juli', pa: 84.66, paTarget: 80.0, mtbf: 0.0, mtbfTarget: 100.0, bs: 114.1, bus: 0 },
-      { month: 'Agustus', pa: 100.0, paTarget: 80.0, mtbf: 13.0, mtbfTarget: 100.0, bs: 0, bus: 0 }
-    ];
-  }, []);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const now = new Date();
+    const unitKey = selectedUnit.trim().toUpperCase();
+    const numberValue = (value: unknown) => Number.parseFloat(String(value ?? 0)) || 0;
+    const unitOf = (record: { equip_no?: string; no_unit?: string }) =>
+      String(record.equip_no || record.no_unit || '').trim().toUpperCase();
+    const dateOf = (value?: string) => {
+      if (!value) return null;
+      const parsed = new Date(String(value).split('T')[0] + 'T00:00:00');
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+    const breakdownType = (value?: string): 'scheduled' | 'unscheduled' | null => {
+      const type = String(value || '').trim().toUpperCase().replace(/[\s_-]+/g, ' ');
+      if (['UNSCH', 'UNSCHEDULED', 'BREAKDOWN UNSCHEDULED', 'BUS'].includes(type)) return 'unscheduled';
+      if (['SCH', 'SCHEDULED', 'BREAKDOWN SCHEDULED', 'BS'].includes(type) || type.startsWith('PM')) return 'scheduled';
+      return null;
+    };
+
+    return Array.from({ length: 4 }, (_, index) => {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - (3 - index), 1);
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const calendarHours = daysInMonth * 24;
+
+      const monthlyWos = workOrders.filter(wo => {
+        const date = dateOf(wo.tgl_rusak || wo.tanggal);
+        return unitOf(wo) === unitKey && date?.getFullYear() === year && date.getMonth() === month;
+      });
+      const monthlyHm = dailyHms.filter(hm => {
+        const date = dateOf(hm.tanggal);
+        return unitOf(hm) === unitKey && date?.getFullYear() === year && date.getMonth() === month;
+      });
+
+      let scheduledHours = 0;
+      let unscheduledHours = 0;
+      let unscheduledCount = 0;
+      monthlyWos.forEach(wo => {
+        const type = breakdownType(wo.sch_unsch);
+        const hours = numberValue(wo.total_downtime ?? wo.downtime_hours);
+        if (type === 'scheduled') scheduledHours += hours;
+        if (type === 'unscheduled') {
+          unscheduledHours += hours;
+          unscheduledCount += 1;
+        }
+      });
+
+      const operatingHours = monthlyHm.reduce((sum, hm) => {
+        const recorded = numberValue(hm.total_hm);
+        return sum + (recorded || Math.max(0, numberValue(hm.hm_akhir) - numberValue(hm.hm_awal)));
+      }, 0);
+      const totalDowntime = scheduledHours + unscheduledHours;
+      const pa = Math.max(0, Math.min(100, ((calendarHours - totalDowntime) / calendarHours) * 100));
+
+      return {
+        month: monthNames[month],
+        pa: Number(pa.toFixed(2)),
+        paTarget: 80,
+        mtbf: Number((unscheduledCount > 0 ? operatingHours / unscheduledCount : operatingHours).toFixed(2)),
+        mtbfTarget: 100,
+        bs: Number(scheduledHours.toFixed(2)),
+        bus: Number(unscheduledHours.toFixed(2))
+      };
+    });
+  }, [selectedUnit, workOrders, dailyHms]);
+
+  const averagePa = useMemo(
+    () => monthlyMetrics.reduce((sum, item) => sum + item.pa, 0) / Math.max(1, monthlyMetrics.length),
+    [monthlyMetrics]
+  );
 
   // Filter samples for selected unit
   const unitSamples = useMemo(() => {
@@ -289,7 +356,7 @@ export const ScheduledOilSamplingView: React.FC<ScheduledOilSamplingViewProps> =
         hm_km: currentEquip.last_hm || 0,
         tgl_input: new Date().toISOString().split('T')[0],
         tgl_rusak: new Date().toISOString().split('T')[0],
-        sch_unsch: 'SCHEDULED',
+        sch_unsch: 'BREAKDOWN SCHEDULED',
         major_comp: compName,
         kendala: `[SOS Alert Rating ${rating}] ${interpretation || 'Perlu tindakan inspeksi internal / penggantian pelumas & filter.'}`,
         status: 'OPEN',
@@ -411,7 +478,7 @@ export const ScheduledOilSamplingView: React.FC<ScheduledOilSamplingViewProps> =
               Physical Availability
             </h3>
             <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-              Avg: 81.1%
+              Avg: {averagePa.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%
             </span>
           </div>
 
@@ -430,42 +497,19 @@ export const ScheduledOilSamplingView: React.FC<ScheduledOilSamplingViewProps> =
               {/* Red Target Benchmark Line (~80% target = y:35) */}
               <line x1="35" y1="35" x2="285" y2="35" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round" />
 
-              {/* Blue Actual Trend Line (45.66, 94.07, 84.66, 100) */}
-              {/* Coordinates:
-                  Mei: x:65, y:69.34
-                  Juni: x:135, y:20.93
-                  Juli: x:205, y:30.34
-                  Agustus: x:275, y:15
-              */}
-              <polyline
-                fill="none"
-                stroke="#2563eb"
-                strokeWidth="2.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                points="65,69.34 135,20.93 205,30.34 275,15"
-              />
-
-              {/* Data points & labels */}
-              <g>
-                <circle cx="65" cy="69.34" r="4" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
-                <text x="65" y="63" textAnchor="middle" fill="#1e293b" fontSize="8.5" fontWeight="900">45,66</text>
-
-                <circle cx="135" cy="20.93" r="4" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
-                <text x="135" y="15" textAnchor="middle" fill="#1e293b" fontSize="8.5" fontWeight="900">94,07</text>
-
-                <circle cx="205" cy="30.34" r="4" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
-                <text x="205" y="24" textAnchor="middle" fill="#1e293b" fontSize="8.5" fontWeight="900">84,66</text>
-
-                <circle cx="275" cy="15" r="4" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
-                <text x="275" y="9" textAnchor="middle" fill="#1e293b" fontSize="8.5" fontWeight="900">100</text>
-              </g>
-
-              {/* X Month labels */}
-              <text x="65" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Mei</text>
-              <text x="135" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Juni</text>
-              <text x="205" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Juli</text>
-              <text x="275" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Agustus</text>
+              <polyline fill="none" stroke="#2563eb" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"
+                points={monthlyMetrics.map((item, index) => `${65 + index * 70},${115 - item.pa}`).join(' ')} />
+              {monthlyMetrics.map((item, index) => {
+                const x = 65 + index * 70;
+                const y = 115 - item.pa;
+                return <g key={`pa-${item.month}`}>
+                  <circle cx={x} cy={y} r="4" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
+                  <text x={x} y={Math.max(9, y - 6)} textAnchor="middle" fill="#1e293b" fontSize="8.5" fontWeight="900">
+                    {item.pa.toLocaleString('id-ID', { maximumFractionDigits: 2 })}
+                  </text>
+                  <text x={x} y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">{item.month}</text>
+                </g>;
+              })}
             </svg>
           </div>
 
@@ -510,42 +554,19 @@ export const ScheduledOilSamplingView: React.FC<ScheduledOilSamplingViewProps> =
               {/* Red Target Benchmark Line (100 Jam = y:48) */}
               <line x1="35" y1="48" x2="285" y2="48" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round" />
 
-              {/* Blue Actual Trend Line (9.43, 7.0, 0, 13.0) */}
-              {/* Scale: 0 -> y:115, 150 -> y:15
-                  Mei (9.43): y:108.7
-                  Juni (7.0): y:110.3
-                  Juli (0): y:115
-                  Agustus (13): y:106.3
-              */}
-              <polyline
-                fill="none"
-                stroke="#2563eb"
-                strokeWidth="2.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                points="65,108.7 135,110.3 205,115 275,106.3"
-              />
-
-              {/* Data points & labels */}
-              <g>
-                <circle cx="65" cy="108.7" r="4" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
-                <text x="65" y="103" textAnchor="middle" fill="#1e293b" fontSize="8.5" fontWeight="900">9,43</text>
-
-                <circle cx="135" cy="110.3" r="4" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
-                <text x="135" y="105" textAnchor="middle" fill="#1e293b" fontSize="8.5" fontWeight="900">7</text>
-
-                <circle cx="205" cy="115" r="4" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
-                <text x="205" y="109" textAnchor="middle" fill="#1e293b" fontSize="8.5" fontWeight="900">0</text>
-
-                <circle cx="275" cy="106.3" r="4" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
-                <text x="275" y="100" textAnchor="middle" fill="#1e293b" fontSize="8.5" fontWeight="900">13</text>
-              </g>
-
-              {/* X Month labels */}
-              <text x="65" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Mei</text>
-              <text x="135" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Juni</text>
-              <text x="205" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Juli</text>
-              <text x="275" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Agustus</text>
+              <polyline fill="none" stroke="#2563eb" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"
+                points={monthlyMetrics.map((item, index) => `${65 + index * 70},${115 - Math.min(150, item.mtbf) / 1.5}`).join(' ')} />
+              {monthlyMetrics.map((item, index) => {
+                const x = 65 + index * 70;
+                const y = 115 - Math.min(150, item.mtbf) / 1.5;
+                return <g key={`mtbf-${item.month}`}>
+                  <circle cx={x} cy={y} r="4" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
+                  <text x={x} y={Math.max(9, y - 6)} textAnchor="middle" fill="#1e293b" fontSize="8.5" fontWeight="900">
+                    {item.mtbf.toLocaleString('id-ID', { maximumFractionDigits: 2 })}
+                  </text>
+                  <text x={x} y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">{item.month}</text>
+                </g>;
+              })}
             </svg>
           </div>
 
@@ -592,38 +613,23 @@ export const ScheduledOilSamplingView: React.FC<ScheduledOilSamplingViewProps> =
               <text x="5" y="85" fill="#94a3b8" fontSize="9" fontWeight="bold">100</text>
               <text x="16" y="118" fill="#94a3b8" fontSize="9" fontWeight="bold">0</text>
 
-              {/* Max value 300 -> 100px bar height. Height = (val / 300) * 100 */}
-              {/* 1. MEI: BS 259.2 (height: 86.4 -> y: 28.6), BUS 145.07 (height: 48.35 -> y: 66.65) */}
-              <rect x="52" y="28.6" width="16" height="86.4" fill="#2563eb" rx="2" />
-              <text x="60" y="23" textAnchor="middle" fill="#1e293b" fontSize="8" fontWeight="bold">259,2</text>
-
-              <rect x="71" y="66.65" width="16" height="48.35" fill="#dc2626" rx="2" />
-              <text x="79" y="61" textAnchor="middle" fill="#1e293b" fontSize="8" fontWeight="bold">145,07</text>
-
-              {/* 2. JUNI: BS 0, BUS 42.67 (height: 14.2 -> y: 100.8) */}
-              <text x="120" y="110" textAnchor="middle" fill="#94a3b8" fontSize="8" fontWeight="bold">0</text>
-              <rect x="135" y="100.8" width="16" height="14.2" fill="#dc2626" rx="2" />
-              <text x="143" y="95" textAnchor="middle" fill="#1e293b" fontSize="8" fontWeight="bold">42,67</text>
-
-              {/* 3. JULI: BS 114.1 (height: 38 -> y: 77), BUS 0 */}
-              <rect x="190" y="77" width="16" height="38" fill="#2563eb" rx="2" />
-              <text x="198" y="71" textAnchor="middle" fill="#1e293b" fontSize="8" fontWeight="bold">114,1</text>
-              <text x="215" y="110" textAnchor="middle" fill="#94a3b8" fontSize="8" fontWeight="bold">0</text>
-
-              {/* 4. AGUSTUS: BS 0, BUS 0 */}
-              <text x="255" y="110" textAnchor="middle" fill="#94a3b8" fontSize="8" fontWeight="bold">0</text>
-              <text x="275" y="110" textAnchor="middle" fill="#94a3b8" fontSize="8" fontWeight="bold">0</text>
-
-              {/* X Month labels */}
-              <text x="69" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Mei</text>
-              <text x="133" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Juni</text>
-              <text x="207" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Juli</text>
-              <text x="265" y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">Agustus</text>
+              {monthlyMetrics.map((item, index) => {
+                const center = 65 + index * 70;
+                const bsHeight = Math.min(100, item.bs / 3);
+                const busHeight = Math.min(100, item.bus / 3);
+                return <g key={`bd-${item.month}`}>
+                  {bsHeight > 0 && <rect x={center - 17} y={115 - bsHeight} width="15" height={bsHeight} fill="#2563eb" rx="2" />}
+                  {busHeight > 0 && <rect x={center + 2} y={115 - busHeight} width="15" height={busHeight} fill="#dc2626" rx="2" />}
+                  <text x={center - 9.5} y={Math.max(10, 109 - bsHeight)} textAnchor="middle" fill="#1e293b" fontSize="8" fontWeight="bold">{item.bs.toLocaleString('id-ID')}</text>
+                  <text x={center + 9.5} y={Math.max(10, 109 - busHeight)} textAnchor="middle" fill="#1e293b" fontSize="8" fontWeight="bold">{item.bus.toLocaleString('id-ID')}</text>
+                  <text x={center} y="128" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="600">{item.month}</text>
+                </g>;
+              })}
             </svg>
           </div>
 
           <div className="flex items-center justify-center gap-4 text-[10px] text-slate-500 font-semibold mt-2 pt-2 border-t border-slate-100">
-            <span>BS: Breakdown Scheduled (PM/Overhaul)</span>
+            <span>BS: Breakdown Scheduled</span>
             <span>•</span>
             <span>BUS: Breakdown Unscheduled</span>
           </div>

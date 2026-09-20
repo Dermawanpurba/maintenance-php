@@ -54,13 +54,13 @@ const INITIAL_NODES: GraphNode[] = [
   { id: 'buat-wo', name: 'Buat Work Order (SPK)', category: 'Maintenance', color: '#ef4444', radius: 16, x: 140, y: 40, z: 80, desc: 'Penerbitan Surat Perintah Kerja (SPK / WO) perbaikan unit breakdown.', targetTab: 'wo' },
   { id: 'list-wo', name: 'Daftar Work Orders', category: 'Maintenance', color: '#f97316', radius: 17, x: 120, y: 0, z: 120, desc: 'Monitoring status WO (Open, Progress, Waiting Parts, Closed) dan estimasi downtime.', targetTab: 'wo' },
   { id: 'backlog', name: 'Backlog Defect Management', category: 'Maintenance', color: '#f59e0b', radius: 15, x: 160, y: -40, z: 60, desc: 'Tracking pekerjaan tertunda yang menunggu sparepart atau jadwal shutdown.', targetTab: 'backlog' },
-  { id: 'pcr', name: 'Plan Component (PCR)', category: 'Maintenance', color: '#06b6d4', radius: 16, x: 140, y: -80, z: -40, desc: 'Monitoring umur pakai major component, estimasi sisa jam kerja, dan overhaul cost.', targetTab: 'pcr' },
-  { id: 'swab-component', name: 'Swab Component (Kanibal)', category: 'Maintenance', color: '#ec4899', radius: 15, x: 60, y: -120, z: 80, desc: 'Pencatatan kanibalisasi komponen antar unit (Donor -> Recipient) dan status restorasi.', targetTab: 'swab' },
+  { id: 'pcr', name: 'Planned Component Replacement (PCR)', category: 'Maintenance', color: '#06b6d4', radius: 16, x: 140, y: -80, z: -40, desc: 'Pemantauan umur pakai komponen utama, estimasi sisa jam kerja, dan biaya overhaul.', targetTab: 'pcr' },
+  { id: 'swab-component', name: 'Component Swapping (Kanibalisasi)', category: 'Maintenance', color: '#ec4899', radius: 15, x: 60, y: -120, z: 80, desc: 'Pencatatan transfer komponen antarunit (donor ke penerima) dan status restorasi.', targetTab: 'swab' },
   { id: 'far', name: 'Failure Analysis (FAR)', category: 'Maintenance', color: '#dc2626', radius: 16, x: 160, y: 60, z: -60, desc: 'Analisis akar masalah kerusakan kritis (RCFA) menggunakan metode 5-Why dan Fishbone.', targetTab: 'far' },
 
   // Operations
   { id: 'daily-hm', name: 'Daily Hour Meter (HM)', category: 'Operations', color: '#0ea5e9', radius: 16, x: -140, y: 40, z: 80, desc: 'Pencatatan jam kerja harian armada (Start HM, Stop HM, KM) dan konsumsi BBM.', targetTab: 'daily_hm' },
-  { id: 'aktifitas', name: 'Laporan Aktifitas Mekanik', category: 'Operations', color: '#14b8a6', radius: 15, x: -160, y: -20, z: 60, desc: 'Logbook aktifitas kerja per shift teknisi/mekanik dan realisasi jam kerja.', targetTab: 'aktifitas' },
+  { id: 'aktifitas', name: 'Laporan Aktivitas Mekanik', category: 'Operations', color: '#14b8a6', radius: 15, x: -160, y: -20, z: 60, desc: 'Logbook aktivitas kerja per shift teknisi/mekanik dan realisasi jam kerja.', targetTab: 'aktifitas' },
   { id: 'inspection', name: 'P2H Daily Inspection', category: 'Operations', color: '#059669', radius: 15, x: -120, y: 60, z: 120, desc: 'Pemeriksaan harian pre-operational checklist (P2H 12 Parameter) sebelum unit operasi.', targetTab: 'p2h' },
 
   // Planning & Coordination

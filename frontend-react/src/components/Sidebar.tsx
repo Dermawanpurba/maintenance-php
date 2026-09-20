@@ -175,15 +175,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'reliability',
-      label: 'Reliability & Comp',
+      label: 'Reliability & Components',
       icon: Microscope,
       iconColor: 'text-orange-400',
       items: [
-        { id: 'pcr',  label: 'Plan Component (PCR)',       icon: Cpu,          iconColor: 'text-orange-400' },
-        { id: 'ppu',  label: 'Pemeriksaan UC (PPU)',        icon: Activity,     iconColor: 'text-teal-400'   },
-        { id: 'sos',  label: 'Oil Sampling (SOS)',          icon: Droplets,     iconColor: 'text-amber-400'  },
-        { id: 'swab', label: 'Swab Component',              icon: Repeat,       iconColor: 'text-pink-400'   },
-        { id: 'far',  label: 'Failure Analysis (FAR)',      icon: AlertTriangle, iconColor: 'text-red-400'   }
+        { id: 'pcr',  label: 'Component Replacement (PCR)', icon: Cpu,          iconColor: 'text-orange-400' },
+        { id: 'ppu',  label: 'Pemeriksaan UC (PPU)',         icon: Activity,     iconColor: 'text-teal-400'   },
+        { id: 'sos',  label: 'Oil Sampling (SOS)',           icon: Droplets,     iconColor: 'text-amber-400'  },
+        { id: 'swab', label: 'Component Swapping',           icon: Repeat,       iconColor: 'text-pink-400'   },
+        { id: 'far',  label: 'Failure Analysis (FAR)',       icon: AlertTriangle, iconColor: 'text-red-400'   }
       ]
     },
     {
@@ -193,8 +193,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       iconColor: 'text-purple-400',
       items: [
         { id: 'p2h', label: 'P2H & Inspeksi Harian', icon: ClipboardList, iconColor: 'text-cyan-300' },
-        { id: 'daily_hm', label: 'Input Daily HM & Fuel', icon: Gauge, iconColor: 'text-purple-300' },
-        { id: 'aktifitas', label: 'Laporan Aktifitas', icon: HardHat, iconColor: 'text-amber-300' }
+        { id: 'daily_hm', label: 'Daily HM & Fuel', icon: Gauge, iconColor: 'text-purple-300' },
+        { id: 'aktifitas', label: 'Laporan Aktivitas', icon: HardHat, iconColor: 'text-amber-300' }
       ]
     },
     {
@@ -203,7 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Briefcase,
       iconColor: 'text-emerald-400',
       items: [
-        { id: 'monthly_budget', label: 'Plan Budget Bulanan', icon: Wallet, iconColor: 'text-emerald-300' },
+        { id: 'monthly_budget', label: 'Rencana Anggaran Bulanan', icon: Wallet, iconColor: 'text-emerald-300' },
         { id: 'target_jam_operasi', label: 'Target Jam Operasi', icon: CalendarDays, iconColor: 'text-blue-400' },
         { id: 'meetings', label: 'Notulen Rapat Plant', icon: FileText, iconColor: 'text-yellow-300' }
       ]
@@ -215,8 +215,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       iconColor: 'text-emerald-400',
       items: [
         { id: 'fleet', label: 'Master Unit & Plan', icon: Truck, iconColor: 'text-indigo-400', count: counts.equip },
-        { id: 'parts', label: 'Master Part & Stock', icon: Package, iconColor: 'text-amber-400', count: counts.parts },
-        { id: 'tools', label: 'Master Tool & Workshop', icon: Hammer, iconColor: 'text-orange-400' },
+        { id: 'parts', label: 'Master Parts & Stock', icon: Package, iconColor: 'text-amber-400', count: counts.parts },
+        { id: 'tools', label: 'Master Tools & Workshop', icon: Hammer, iconColor: 'text-orange-400' },
         { id: 'master_crew', label: 'Master Crew & Komponen', icon: Users, iconColor: 'text-teal-400' }
       ]
     },

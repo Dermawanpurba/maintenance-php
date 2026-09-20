@@ -94,15 +94,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return d >= startDate && d <= endDate;
     });
 
-    // Breakdown WOs & Scheduled PM
-    const unschWOs = filteredWOs.filter(w => {
-      const s = (w.sch_unsch || '').toUpperCase();
-      return s === 'UNSCH' || s.includes('BREAKDOWN');
-    });
-    const schWOs = filteredWOs.filter(w => {
-      const s = (w.sch_unsch || '').toUpperCase();
-      return s === 'SCH' || s.includes('PM') || s.includes('SCHEDULE');
-    });
+    // Klasifikasi baku: BS = Breakdown Scheduled, BUS = Breakdown Unscheduled.
+    // Normalisasi ini mempertahankan kompatibilitas nilai historis SCH/UNSCH.
+    const breakdownType = (value?: string): 'scheduled' | 'unscheduled' | null => {
+      const type = String(value || '').trim().toUpperCase().replace(/[\s_-]+/g, ' ');
+      if (['UNSCH', 'UNSCHEDULED', 'BREAKDOWN UNSCHEDULED', 'BUS'].includes(type)) return 'unscheduled';
+      if (['SCH', 'SCHEDULED', 'BREAKDOWN SCHEDULED', 'BS'].includes(type) || type.startsWith('PM')) return 'scheduled';
+      return null;
+    };
+    const unschWOs = filteredWOs.filter(w => breakdownType(w.sch_unsch) === 'unscheduled');
+    const schWOs = filteredWOs.filter(w => breakdownType(w.sch_unsch) === 'scheduled');
 
     // Lost Hours Calculation
     let totalBDHours = 0;
@@ -110,8 +111,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     filteredWOs.forEach(w => {
       const hrs = parseFloat(String(w.total_downtime)) || 0;
       totalBDHours += hrs;
-      const s = (w.sch_unsch || '').toUpperCase();
-      if (s === 'UNSCH' || s.includes('BREAKDOWN')) {
+      if (breakdownType(w.sch_unsch) === 'unscheduled') {
         unschHours += hrs;
       }
     });
@@ -145,7 +145,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     let eu = Math.min(100, Math.round((totalOperatingHM / planTotalHours) * 100));
     if (isNaN(eu) || eu === 0) eu = 72;
 
-    // MTTR: Mean Time To Repair (UNSCH Downtime / UNSCH Breakdown Count)
+    // MTTR: Mean Time to Repair (BUS downtime / jumlah Breakdown Unscheduled)
     const countUnsch = Math.max(1, unschWOs.length || bd);
     const mttr = (unschHours / countUnsch).toFixed(1);
 
@@ -644,7 +644,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {metrics.proactiveRatio}<span className="text-base font-bold text-slate-400">%</span>
           </h3>
           <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 truncate">
-            Proactive Ratio (SCH/Tot)
+            Proactive Ratio (BS/Total)
           </p>
         </div>
       </div>

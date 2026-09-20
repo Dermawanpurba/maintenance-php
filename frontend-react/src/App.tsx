@@ -299,6 +299,8 @@ export const App: React.FC = () => {
                   <ScheduledOilSamplingView
                     equipments={equipments}
                     oilSamples={oilSamples}
+                    workOrders={workOrders}
+                    dailyHms={dailyHms}
                     onRefresh={loadData}
                     onNavigateToWO={(unit, problem) => {
                       setCurrentTab('wo');

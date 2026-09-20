@@ -250,7 +250,7 @@ export const PcrView: React.FC<PcrViewProps> = ({
   };
 
   const handleDelete = async (id: string | number) => {
-    if (!window.confirm('Hapus jadwal Plan Component Replacement (PCR) ini?')) return;
+    if (!window.confirm('Hapus jadwal Planned Component Replacement (PCR) ini?')) return;
     try {
       const res = await api.deletePCR(id);
       if (res.success) {
@@ -393,7 +393,7 @@ export const PcrView: React.FC<PcrViewProps> = ({
           <div>
             <div className="flex items-center space-x-2">
               <h3 className="text-base font-black text-slate-900 tracking-tight">
-                Plan Component Replacement (PCR Register)
+                Planned Component Replacement (PCR Register)
               </h3>
               <span className="px-2 py-0.5 rounded-md bg-orange-100 text-orange-800 text-[10px] font-black">
                 Live HM
@@ -626,7 +626,7 @@ export const PcrView: React.FC<PcrViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900 tracking-tight">
-                    Catat Jadwal Plan Component Replacement (PCR)
+                    Catat Jadwal Planned Component Replacement (PCR)
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     Otomatis tersinkronisasi dengan data Input Daily HM &amp; Fuel
