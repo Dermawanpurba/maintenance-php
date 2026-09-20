@@ -203,7 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Briefcase,
       iconColor: 'text-emerald-400',
       items: [
-        { id: 'monthly_budget', label: 'Rencana Anggaran Bulanan', icon: Wallet, iconColor: 'text-emerald-300' },
+        { id: 'monthly_budget', label: 'Budget & Realization', icon: Wallet, iconColor: 'text-emerald-300' },
         { id: 'target_jam_operasi', label: 'Target Jam Operasi', icon: CalendarDays, iconColor: 'text-blue-400' },
         { id: 'meetings', label: 'Notulen Rapat Plant', icon: FileText, iconColor: 'text-yellow-300' }
       ]

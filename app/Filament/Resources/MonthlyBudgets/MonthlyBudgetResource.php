@@ -18,7 +18,13 @@ use Filament\Tables\Table;
 
 class MonthlyBudgetResource extends Resource
 {
-    protected static ?string $model = MonthlyBudget::class;
+    protected static ?string $navigationLabel = 'Maintenance Budget & Realization';
+
+    protected static ?string $navigationGroup = 'Planning & Coordination';
+
+    protected static ?string $modelLabel = 'Maintenance Budget';
+
+    protected static ?string $pluralModelLabel = 'Maintenance Budget & Realization';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 

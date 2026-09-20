@@ -16,18 +16,29 @@ class MonthlyBudgetsTable
         return $table
             ->columns([
                 TextColumn::make('item_id')
+                    ->label('ID Pos')
                     ->searchable(),
+                TextColumn::make('category')
+                    ->label('Kategori Anggaran')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('month_year')
-                    ->numeric()
+                    ->label('Periode')
                     ->sortable(),
                 TextColumn::make('budget_plan')
+                    ->label('Plan (Rp)')
                     ->numeric()
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('actual_spent')
+                    ->label('Actual (Rp)')
                     ->numeric()
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('variance')
+                    ->label('Selisih (Rp)')
                     ->numeric()
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()

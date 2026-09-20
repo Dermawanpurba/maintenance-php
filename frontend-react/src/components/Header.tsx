@@ -150,9 +150,9 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     tag: 'DAILY OPS'
   },
   monthly_budget: {
-    title: 'Rencana Anggaran Bulanan Plant & Requisition',
-    subtitle: 'Alokasi anggaran belanja suku cadang, pelumas, vendor machining, dan ban',
-    tag: 'PLANNING'
+    title: 'Maintenance Budget & Realization',
+    subtitle: 'Monitoring anggaran, realisasi biaya perawatan, utilisasi budget & cost per unit armada alat berat',
+    tag: 'BUDGET & COST'
   },
   meetings: {
     title: 'Notulen Rapat & Koordinasi Plant Bulanan',
