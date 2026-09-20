@@ -5,11 +5,14 @@ export const api = {
   async postAction<T = any>(action: string, data: any = {}): Promise<{ success: boolean; message?: string; [key: string]: any }> {
     const res = await fetch('/api/maintenance/router', {
       method: 'POST',
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
       },
-      body: JSON.stringify({ action, ...data })
+      body: JSON.stringify({ action, ...data, _ts: Date.now() })
     });
 
     if (!res.ok) {

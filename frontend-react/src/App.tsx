@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
@@ -92,11 +92,18 @@ export const App: React.FC = () => {
   const [targetJamHarian, setTargetJamHarian] = useState<TargetJamHarian[]>([]);
   const [inspections, setInspections] = useState<any[]>([]);
   const [isBDAwalModalOpen, setIsBDAwalModalOpen] = useState(false);
+  const requestInFlight = useRef(false);
 
-  const loadData = async () => {
+  const loadData = async (silentArg: boolean | unknown = false) => {
+    // Callback ini juga diteruskan ke tombol/form anak yang dapat mengirim event.
+    // Hanya nilai boolean true eksplisit yang dianggap sebagai refresh senyap.
+    const silent = silentArg === true;
+    if (requestInFlight.current) return;
+
+    requestInFlight.current = true;
     const startTime = performance.now();
     try {
-      setRefreshing(true);
+      if (!silent) setRefreshing(true);
       const data = await api.getOptimizedData();
       const calcLatency = Math.round(performance.now() - startTime);
       setLatency(calcLatency);
@@ -133,15 +140,31 @@ export const App: React.FC = () => {
       console.error('Failed to fetch data from API:', err);
       setApiOnline(false);
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
-      setRefreshing(false);
+      if (!silent) setRefreshing(false);
     }
   };
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 45000);
-    return () => clearInterval(interval);
+
+    // Filament dan React memakai database Laravel yang sama. Polling pendek serta
+    // refresh saat tab aktif kembali membuat perubahan admin terlihat tanpa reload.
+    const interval = window.setInterval(() => loadData(true), 10000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') loadData(true);
+    };
+    const refreshOnFocus = () => loadData(true);
+
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshOnFocus);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshOnFocus);
+    };
   }, []);
 
   const handleBackup = () => {
@@ -209,7 +232,7 @@ export const App: React.FC = () => {
           onOpenSidebar={() => setIsSidebarOpen(true)}
           apiOnline={apiOnline}
           latency={latency}
-          onRefresh={loadData}
+          onRefresh={() => loadData()}
           refreshing={refreshing}
           onOpenBDAwal={() => setIsBDAwalModalOpen(true)}
           onPrintExecSummary={handlePrintExecReport}

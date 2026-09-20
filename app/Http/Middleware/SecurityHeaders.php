@@ -25,6 +25,14 @@ class SecurityHeaders
         $csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https: data:; img-src 'self' data: https: blob:; connect-src 'self' https: wss:; frame-ancestors 'self';";
         $response->headers->set('Content-Security-Policy', $csp);
 
+        // API dataset harus selalu dibaca ulang agar perubahan Filament langsung
+        // terlihat di React dan tidak tertahan cache browser/proxy/CDN.
+        if ($request->is('api/*')) {
+            $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0');
+            $response->headers->set('Pragma', 'no-cache');
+            $response->headers->set('Expires', '0');
+        }
+
         // 3. Clickjacking & MIME Sniffing Protection
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
