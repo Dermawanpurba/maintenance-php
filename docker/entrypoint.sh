@@ -75,6 +75,16 @@ echo "[5/9] Menjalankan database migrations & sinkronisasi skema..."
 chmod 775 /var/www/html/database 2>/dev/null || true
 chmod 666 /var/www/html/database/database.sqlite* 2>/dev/null || true
 chown -R www-data:www-data /var/www/html/database 2>/dev/null || true
+
+# Sinkronkan file migration & seeder dari image build ke persistent volume jika me-mount /var/www/html/database
+if [ -d "/var/www/html/database_template" ]; then
+    echo "Menyinkronkan file migration & seeder terbaru dari image ke persistent volume..."
+    mkdir -p /var/www/html/database/migrations /var/www/html/database/seeders
+    cp -rf /var/www/html/database_template/migrations/* /var/www/html/database/migrations/ 2>/dev/null || true
+    cp -rf /var/www/html/database_template/seeders/* /var/www/html/database/seeders/ 2>/dev/null || true
+    composer dump-autoload -o --no-interaction 2>/dev/null || true
+fi
+
 sqlite3 "$SQLITE_DB" "ALTER TABLE app_users ADD COLUMN email TEXT;" 2>/dev/null || true
 sqlite3 "$SQLITE_DB" "UPDATE app_users SET email = username || '@wosys.local' WHERE email IS NULL OR email = '';" 2>/dev/null || true
 php artisan migrate --force --no-interaction || true

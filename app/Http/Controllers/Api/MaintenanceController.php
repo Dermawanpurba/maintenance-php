@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Artisan;
@@ -72,6 +73,9 @@ class MaintenanceController extends Controller
         }
 
         try {
+            // Guarantee database schema integrity on every single API request
+            $this->ensureDatabaseIntegrity();
+
             switch ($action) {
                 case 'ping':
                     return response()->json(['success' => true, 'message' => 'API OK', 'version' => 'maintenance-v1-laravel13']);
@@ -370,64 +374,214 @@ class MaintenanceController extends Controller
     {
         static $checked = false;
         if ($checked) return;
-        $checked = true;
 
-        $missingTables = [];
-        $requiredTables = [
-            'oil_samples',
-            'maintenance_weeks',
-            'ppu_records',
-            'target_jam_operasi',
-            'target_jam_harian'
-        ];
-
-        foreach ($requiredTables as $t) {
-            if (!Schema::hasTable($t)) {
-                $missingTables[] = $t;
-            }
-        }
-
-        if (!empty($missingTables)) {
-            try {
-                Artisan::call('migrate', ['--force' => true, '--no-interaction' => true]);
-
-                // Auto-seed missing tables if newly migrated
-                if (Schema::hasTable('oil_samples') && OilSample::count() === 0) {
-                    Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\OilSampleSeeder', '--force' => true]);
-                }
-                if (Schema::hasTable('maintenance_weeks') && MaintenanceWeek::count() === 0) {
-                    Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\BasicMaintenanceHistoricalSeeder', '--force' => true]);
-                }
-            } catch (\Throwable $e) {
-                Log::error('Automated self-healing migration failed: ' . $e->getMessage());
-            }
-        }
-
-        // Check required columns on older SQLite databases
+        // 1. Coba migrasi resmi via Artisan migrate
         try {
+            Artisan::call('migrate', ['--force' => true, '--no-interaction' => true]);
+        } catch (\Throwable $e) {
+            Log::warning('Artisan migrate notice in ensureDatabaseIntegrity: ' . $e->getMessage());
+        }
+
+        // 2. Direct DDL Fail-safe: pastikan seluruh tabel baru ada di SQLite
+        // (Sangat penting jika persistent volume Docker menimpa folder database/migrations)
+        try {
+            if (!Schema::hasTable('target_jam_operasi')) {
+                Schema::create('target_jam_operasi', function (Blueprint $table) {
+                    $table->id();
+                    $table->text('equip_no')->nullable();
+                    $table->text('section')->nullable()->default('MINING');
+                    $table->text('model')->nullable();
+                    $table->double('est_hm')->nullable()->default(0);
+                    $table->text('est_hm_date')->nullable()->default('01-Sep-26');
+                    $table->text('status')->nullable()->default('RFU');
+                    $table->double('next_service_hours_due')->nullable()->default(0);
+                    $table->double('next_service_type_hm')->nullable()->default(250);
+                    $table->text('next_service_type')->nullable()->default('PS-250');
+                    $table->text('next_service_date')->nullable();
+                    $table->double('next_service_hours_due_2')->nullable()->default(0);
+                    $table->text('next_service_type_2')->nullable()->default('PS-500');
+                    $table->text('next_service_date_2')->nullable();
+                    $table->integer('pm_250')->nullable()->default(0);
+                    $table->integer('pm_500')->nullable()->default(0);
+                    $table->integer('pm_1000')->nullable()->default(0);
+                    $table->integer('pm_2000')->nullable()->default(0);
+                    $table->integer('pm_4000')->nullable()->default(0);
+                    $table->integer('pm_other')->nullable()->default(0);
+                    $table->double('downtime_pm')->nullable()->default(0);
+                    $table->double('downtime_backlog')->nullable()->default(0);
+                    $table->double('downtime_midlife')->nullable()->default(0);
+                    $table->double('downtime_pcr')->nullable()->default(0);
+                    $table->integer('ba_gg')->nullable()->default(0);
+                    $table->integer('oil_fe')->nullable()->default(0);
+                    $table->integer('pos')->nullable()->default(0);
+                    $table->integer('plan_year')->nullable()->default(2026);
+                    $table->integer('plan_month')->nullable()->default(9);
+                    $table->timestamps();
+                });
+            }
+
+            if (!Schema::hasTable('target_jam_harian')) {
+                Schema::create('target_jam_harian', function (Blueprint $table) {
+                    $table->id();
+                    $table->text('equip_no')->nullable();
+                    $table->integer('plan_year')->nullable()->default(2026);
+                    $table->integer('plan_month')->nullable()->default(9);
+                    $table->integer('plan_day')->nullable()->default(1);
+                    $table->double('jam_rencana')->nullable()->default(0);
+                    $table->text('downtime_type')->nullable()->default('PM');
+                    $table->timestamps();
+                });
+            }
+
+            if (!Schema::hasTable('oil_samples')) {
+                Schema::create('oil_samples', function (Blueprint $table) {
+                    $table->id();
+                    $table->string('item_id')->nullable()->index();
+                    $table->string('sample_code')->nullable();
+                    $table->string('equip_no')->nullable()->index();
+                    $table->string('compartment')->nullable();
+                    $table->string('sample_date')->nullable();
+                    $table->double('hm')->nullable()->default(0);
+                    $table->string('oil_grade')->nullable();
+                    $table->string('rating', 5)->nullable()->default('A');
+                    $table->double('top_up')->nullable()->default(0);
+                    $table->text('repair_notes')->nullable();
+                    $table->double('si')->nullable()->default(0);
+                    $table->double('al')->nullable()->default(0);
+                    $table->double('na')->nullable()->default(0);
+                    $table->double('fe')->nullable()->default(0);
+                    $table->double('cu')->nullable()->default(0);
+                    $table->double('cr')->nullable()->default(0);
+                    $table->double('pb')->nullable()->default(0);
+                    $table->double('pq')->nullable()->default(0);
+                    $table->double('visc_100')->nullable()->default(0);
+                    $table->double('oxi')->nullable()->default(0);
+                    $table->double('soot')->nullable()->default(0);
+                    $table->double('tbn')->nullable()->default(0);
+                    $table->double('iso_6')->nullable()->default(0);
+                    $table->double('iso_14')->nullable()->default(0);
+                    $table->double('water_pct')->nullable()->default(0);
+                    $table->longText('interpretation')->nullable();
+                    $table->string('lab_vendor')->nullable()->default('Caterpillar SOS Lab');
+                    $table->string('status')->nullable()->default('APPROVED');
+                    $table->string('created_by')->nullable()->default('Planner SOS');
+                    $table->timestamps();
+                });
+            }
+
+            if (!Schema::hasTable('maintenance_weeks')) {
+                Schema::create('maintenance_weeks', function (Blueprint $table) {
+                    $table->id();
+                    $table->string('week_no')->unique()->index();
+                    $table->string('label')->nullable();
+                    $table->date('start_date')->nullable();
+                    $table->date('end_date')->nullable();
+                    $table->boolean('is_active')->default(false);
+                    $table->integer('target_compliance')->default(100);
+                    $table->text('notes')->nullable();
+                    $table->timestamps();
+                });
+            }
+
+            if (!Schema::hasTable('ppu_records')) {
+                Schema::create('ppu_records', function (Blueprint $table) {
+                    $table->id();
+                    $table->string('unit_no')->nullable()->index();
+                    $table->string('model')->nullable();
+                    $table->string('track_group_used')->nullable();
+                    $table->string('cts_date')->nullable();
+                    $table->string('last_fitted_track_group')->nullable();
+                    $table->double('pct_hours_track')->nullable()->default(0);
+                    $table->double('hours_track_gp')->nullable()->default(0);
+                    $table->double('smu')->nullable()->default(0);
+                    $table->double('sprocket_lh')->nullable()->default(0);
+                    $table->double('sprocket_rh')->nullable()->default(0);
+                    $table->double('link_height_lh')->nullable()->default(0);
+                    $table->double('link_height_rh')->nullable()->default(0);
+                    $table->double('chain_bushing_lh')->nullable()->default(0);
+                    $table->double('chain_bushing_rh')->nullable()->default(0);
+                    $table->double('frame_ext_lh')->nullable()->default(0);
+                    $table->double('frame_ext_rh')->nullable()->default(0);
+                    $table->double('grouser_height_lh')->nullable()->default(0);
+                    $table->double('grouser_height_rh')->nullable()->default(0);
+                    $table->double('idler_front_lh')->nullable()->default(0);
+                    $table->double('idler_front_rh')->nullable()->default(0);
+                    $table->double('idler_rear_lh')->nullable()->default(0);
+                    $table->double('idler_rear_rh')->nullable()->default(0);
+                    $table->string('inspection_date')->nullable();
+                    $table->string('inspector')->nullable();
+                    $table->text('notes')->nullable();
+                    $table->string('status')->nullable()->default('NORMAL');
+                    $table->string('created_by')->nullable()->default('Planner');
+                    $table->timestamps();
+                });
+            }
+        } catch (\Throwable $e) {
+            Log::error('Direct DDL schema creation error: ' . $e->getMessage());
+        }
+
+        // 3. Pastikan kolom-kolom baru tersedia di seluruh tabel SQLite
+        try {
+            if (Schema::hasTable('target_jam_operasi')) {
+                $cols = [
+                    'est_hm_date'              => ['text', '01-Sep-26'],
+                    'next_service_hours_due_2' => ['double', 0],
+                    'next_service_type_2'      => ['text', 'PS-500'],
+                    'next_service_date_2'      => ['text', null],
+                    'pm_4000'                  => ['integer', 0],
+                    'downtime_pm'              => ['double', 0],
+                    'downtime_backlog'         => ['double', 0],
+                    'downtime_midlife'         => ['double', 0],
+                    'downtime_pcr'             => ['double', 0],
+                ];
+                foreach ($cols as $col => [$type, $default]) {
+                    if (!Schema::hasColumn('target_jam_operasi', $col)) {
+                        Schema::table('target_jam_operasi', function (Blueprint $table) use ($col, $type, $default) {
+                            if ($type === 'double') $table->double($col)->nullable()->default($default);
+                            elseif ($type === 'integer') $table->integer($col)->nullable()->default($default);
+                            else $table->text($col)->nullable()->default($default);
+                        });
+                    }
+                }
+            }
+
+            if (Schema::hasTable('target_jam_harian') && !Schema::hasColumn('target_jam_harian', 'downtime_type')) {
+                Schema::table('target_jam_harian', function (Blueprint $table) {
+                    $table->text('downtime_type')->nullable()->default('PM');
+                });
+            }
+
             if (Schema::hasTable('master_equips') && !Schema::hasColumn('master_equips', 'last_hm')) {
-                Schema::table('master_equips', function ($table) {
+                Schema::table('master_equips', function (Blueprint $table) {
                     $table->double('last_hm')->nullable()->default(0);
                 });
             }
+
             if (Schema::hasTable('pcr_components') && !Schema::hasColumn('pcr_components', 'install_hm')) {
-                Schema::table('pcr_components', function ($table) {
+                Schema::table('pcr_components', function (Blueprint $table) {
                     $table->double('install_hm')->nullable()->default(0);
                 });
             }
+
+            if (Schema::hasTable('app_users') && !Schema::hasColumn('app_users', 'email')) {
+                Schema::table('app_users', function (Blueprint $table) {
+                    $table->text('email')->nullable();
+                });
+            }
+
             if (Schema::hasTable('pm_records')) {
                 if (!Schema::hasColumn('pm_records', 'week_no')) {
-                    Schema::table('pm_records', function ($table) {
+                    Schema::table('pm_records', function (Blueprint $table) {
                         $table->string('week_no')->nullable()->default('WEEK 40');
                     });
                 }
                 if (!Schema::hasColumn('pm_records', 'achievement_pct')) {
-                    Schema::table('pm_records', function ($table) {
+                    Schema::table('pm_records', function (Blueprint $table) {
                         $table->double('achievement_pct')->nullable()->default(100);
                     });
                 }
                 if (!Schema::hasColumn('pm_records', 'checklist_json')) {
-                    Schema::table('pm_records', function ($table) {
+                    Schema::table('pm_records', function (Blueprint $table) {
                         $table->longText('checklist_json')->nullable();
                     });
                 }
@@ -435,6 +589,20 @@ class MaintenanceController extends Controller
         } catch (\Throwable $e) {
             Log::warning('Column self-healing warning: ' . $e->getMessage());
         }
+
+        // 4. Seeder aman jika tabel baru kosong
+        try {
+            if (class_exists(\Database\Seeders\OilSampleSeeder::class) && Schema::hasTable('oil_samples') && OilSample::count() === 0) {
+                Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\OilSampleSeeder', '--force' => true]);
+            }
+            if (class_exists(\Database\Seeders\BasicMaintenanceHistoricalSeeder::class) && Schema::hasTable('maintenance_weeks') && MaintenanceWeek::count() === 0) {
+                Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\BasicMaintenanceHistoricalSeeder', '--force' => true]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Seeder execution warning: ' . $e->getMessage());
+        }
+
+        $checked = true;
     }
 
     /**
@@ -443,6 +611,7 @@ class MaintenanceController extends Controller
     public function syncDatabaseSchema()
     {
         try {
+            $this->ensureDatabaseIntegrity();
             Artisan::call('migrate', ['--force' => true, '--no-interaction' => true]);
             $migrateOutput = trim(Artisan::output());
 

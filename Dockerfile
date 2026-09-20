@@ -50,8 +50,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-pl
 # Prepare SQLite Database & Storage directories
 RUN mkdir -p /var/www/html/database /var/www/html/storage/app/public /var/www/html/bootstrap/cache /var/www/html/public_frontend \
     && touch /var/www/html/database/database.sqlite \
-    && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database /var/www/html/public /var/www/html/public_frontend \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
+    && cp -rf /var/www/html/database /var/www/html/database_template \
+    && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database /var/www/html/database_template /var/www/html/public /var/www/html/public_frontend \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database /var/www/html/database_template
 
 # Copy custom configurations
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
