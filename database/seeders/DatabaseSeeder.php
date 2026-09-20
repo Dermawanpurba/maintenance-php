@@ -11,6 +11,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             MaintenanceDatabaseSeeder::class,
             SampleDataSeeder::class,
+            OilSampleSeeder::class,
+            BasicMaintenanceHistoricalSeeder::class,
         ]);
     }
 }

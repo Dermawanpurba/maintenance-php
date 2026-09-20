@@ -26,12 +26,31 @@ Route::prefix('maintenance')->group(function () {
         $errorLines = array_values(array_filter($lines, fn ($l) => str_contains($l, '.ERROR:')));
         $lastErrors = array_slice($errorLines, -10);
         $users = \App\Models\User::all(['id', 'username', 'email', 'role', 'status'])->toArray();
+        
+        $tableStats = [];
+        try {
+            $tables = \Illuminate\Support\Facades\DB::select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+            foreach ($tables as $t) {
+                $tName = $t->name;
+                try {
+                    $tableStats[$tName] = \Illuminate\Support\Facades\DB::table($tName)->count();
+                } catch (\Throwable $e) {
+                    $tableStats[$tName] = 'error: ' . $e->getMessage();
+                }
+            }
+        } catch (\Throwable $e) {
+            $tableStats = ['error' => $e->getMessage()];
+        }
+
         return response()->json([
             'last_errors' => $lastErrors,
             'total_errors' => count($errorLines),
             'users' => $users,
+            'tables' => $tableStats,
+            'db_path' => config('database.connections.sqlite.database'),
         ]);
     });
+    Route::match(['get', 'post'], '/db-sync', [MaintenanceController::class, 'syncDatabaseSchema']);
     Route::get('/optimized-data', [MaintenanceController::class, 'getOptimizedData']);
     Route::post('/login', [MaintenanceController::class, 'loginUser']);
     

@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use App\Models\UserAccess;
 use App\Models\PlanAlat;
@@ -75,6 +78,9 @@ class MaintenanceController extends Controller
 
                 case 'getOptimizedData':
                     return response()->json($this->getOptimizedData());
+
+                case 'syncDatabase':
+                    return response()->json($this->syncDatabaseSchema());
 
                 case 'login':
                     return response()->json($this->loginUser($data));
@@ -344,29 +350,172 @@ class MaintenanceController extends Controller
     }
 
     /**
-     * Replicates getOptimizedData() from code.gs line 1751
+     * Resilient database query helper that prevents one sub-module failure from crashing the whole payload
      */
-    public function getOptimizedData()
+    private function safelyFetch(callable $callback, $fallback = [])
     {
-        // Build user access map
-        $accessData = UserAccess::all();
-        $userAccessMap = [];
-        foreach ($accessData as $ua) {
-            $u = strtolower(trim($ua->username));
-            $f = trim($ua->feature);
-            if (!empty($u) && !empty($f)) {
-                if (!isset($userAccessMap[$u])) {
-                    $userAccessMap[$u] = [];
-                }
-                $userAccessMap[$u][] = $f;
+        try {
+            return $callback();
+        } catch (\Throwable $e) {
+            Log::warning('Resilient fetch fallback invoked: ' . $e->getMessage());
+            return $fallback;
+        }
+    }
+
+    /**
+     * Self-healing SQLite schema: verifies all essential tables and columns exist,
+     * running automated migrations and seeding if any disparity is detected.
+     */
+    public function ensureDatabaseIntegrity()
+    {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+
+        $missingTables = [];
+        $requiredTables = [
+            'oil_samples',
+            'maintenance_weeks',
+            'ppu_records',
+            'target_jam_operasi',
+            'target_jam_harian'
+        ];
+
+        foreach ($requiredTables as $t) {
+            if (!Schema::hasTable($t)) {
+                $missingTables[] = $t;
             }
         }
 
-        $planAlat = $this->mapRecords(PlanAlat::all());
+        if (!empty($missingTables)) {
+            try {
+                Artisan::call('migrate', ['--force' => true, '--no-interaction' => true]);
+
+                // Auto-seed missing tables if newly migrated
+                if (Schema::hasTable('oil_samples') && OilSample::count() === 0) {
+                    Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\OilSampleSeeder', '--force' => true]);
+                }
+                if (Schema::hasTable('maintenance_weeks') && MaintenanceWeek::count() === 0) {
+                    Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\BasicMaintenanceHistoricalSeeder', '--force' => true]);
+                }
+            } catch (\Throwable $e) {
+                Log::error('Automated self-healing migration failed: ' . $e->getMessage());
+            }
+        }
+
+        // Check required columns on older SQLite databases
+        try {
+            if (Schema::hasTable('master_equips') && !Schema::hasColumn('master_equips', 'last_hm')) {
+                Schema::table('master_equips', function ($table) {
+                    $table->double('last_hm')->nullable()->default(0);
+                });
+            }
+            if (Schema::hasTable('pcr_components') && !Schema::hasColumn('pcr_components', 'install_hm')) {
+                Schema::table('pcr_components', function ($table) {
+                    $table->double('install_hm')->nullable()->default(0);
+                });
+            }
+            if (Schema::hasTable('pm_records')) {
+                if (!Schema::hasColumn('pm_records', 'week_no')) {
+                    Schema::table('pm_records', function ($table) {
+                        $table->string('week_no')->nullable()->default('WEEK 40');
+                    });
+                }
+                if (!Schema::hasColumn('pm_records', 'achievement_pct')) {
+                    Schema::table('pm_records', function ($table) {
+                        $table->double('achievement_pct')->nullable()->default(100);
+                    });
+                }
+                if (!Schema::hasColumn('pm_records', 'checklist_json')) {
+                    Schema::table('pm_records', function ($table) {
+                        $table->longText('checklist_json')->nullable();
+                    });
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Column self-healing warning: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Manual / diagnostic endpoint to force-run migrations, verify tables, and return complete status
+     */
+    public function syncDatabaseSchema()
+    {
+        try {
+            Artisan::call('migrate', ['--force' => true, '--no-interaction' => true]);
+            $migrateOutput = trim(Artisan::output());
+
+            // Run seeders if tables are empty
+            $seeded = [];
+            if (Schema::hasTable('oil_samples') && OilSample::count() === 0) {
+                Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\OilSampleSeeder', '--force' => true]);
+                $seeded[] = 'OilSampleSeeder';
+            }
+            if (Schema::hasTable('maintenance_weeks') && MaintenanceWeek::count() === 0) {
+                Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\BasicMaintenanceHistoricalSeeder', '--force' => true]);
+                $seeded[] = 'BasicMaintenanceHistoricalSeeder';
+            }
+
+            // Get SQLite tables and counts
+            $tables = DB::select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+            $tableStats = [];
+            foreach ($tables as $t) {
+                $tName = $t->name;
+                try {
+                    $tableStats[$tName] = DB::table($tName)->count();
+                } catch (\Throwable $e) {
+                    $tableStats[$tName] = 'error: ' . $e->getMessage();
+                }
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Database schema sync completed successfully',
+                'migrate_output' => $migrateOutput,
+                'seeders_run' => $seeded,
+                'tables' => $tableStats,
+                'database_path' => config('database.connections.sqlite.database'),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'Database sync failed: ' . $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ];
+        }
+    }
+
+    /**
+     * Replicates getOptimizedData() from code.gs line 1751 with self-healing schema and resilient error isolation
+     */
+    public function getOptimizedData()
+    {
+        // 1. Auto-heal missing tables and columns if running against an unmigrated database
+        $this->ensureDatabaseIntegrity();
+
+        // 2. Build user access map safely
+        $userAccessMap = $this->safelyFetch(function() {
+            $accessData = UserAccess::all();
+            $map = [];
+            foreach ($accessData as $ua) {
+                $u = strtolower(trim($ua->username));
+                $f = trim($ua->feature);
+                if (!empty($u) && !empty($f)) {
+                    if (!isset($map[$u])) {
+                        $map[$u] = [];
+                    }
+                    $map[$u][] = $f;
+                }
+            }
+            return $map;
+        }, []);
+
+        $planAlat = $this->safelyFetch(fn() => $this->mapRecords(PlanAlat::all()), []);
 
         return [
             'success' => true,
-            'equip' => MasterEquip::all()->map(function($eq) {
+            'equip' => $this->safelyFetch(fn() => MasterEquip::all()->map(function($eq) {
                 $arr = $eq->toArray();
                 $arr['no_unit'] = $arr['equip_no'] ?? ($arr['no_unit'] ?? '');
                 $arr['tipe'] = $arr['unit_type'] ?? ($arr['tipe'] ?? '');
@@ -374,19 +523,19 @@ class MaintenanceController extends Controller
                 $arr['lokasi'] = $arr['location'] ?? ($arr['lokasi'] ?? 'Site Plant');
                 $arr['last_hm'] = $arr['last_hm'] ?? 0;
                 return $arr;
-            })->values()->all(),
-            'parts' => MasterPart::all()->map(function($p) {
+            })->values()->all(), []),
+            'parts' => $this->safelyFetch(fn() => MasterPart::all()->map(function($p) {
                 $arr = $p->toArray();
                 $arr['part_name'] = $arr['description'] ?? ($arr['part_name'] ?? '');
                 $arr['unit'] = $arr['uom'] ?? ($arr['unit'] ?? 'PCS');
                 $arr['stock_qty'] = $arr['stock'] ?? ($arr['stock_qty'] ?? 0);
                 $arr['category'] = $arr['category_spare_part'] ?? ($arr['category'] ?? 'Fast Moving');
                 return $arr;
-            })->values()->all(),
-            'stock' => $this->mapRecords(Stock::all()),
+            })->values()->all(), []),
+            'stock' => $this->safelyFetch(fn() => $this->mapRecords(Stock::all()), []),
             'planAlat' => $planAlat,
-            'planService' => $this->mapRecords(PlanService::all()),
-            'dailyHM' => DailyHm::all()->map(function($h) {
+            'planService' => $this->safelyFetch(fn() => $this->mapRecords(PlanService::all()), []),
+            'dailyHM' => $this->safelyFetch(fn() => DailyHm::all()->map(function($h) {
                 $arr = $h->toArray();
                 $arr['id'] = $arr['item_id'] ?? $arr['id'];
                 $arr['equip_no'] = $arr['equip_no'] ?? ($arr['no_unit'] ?? '');
@@ -395,24 +544,24 @@ class MaintenanceController extends Controller
                 $arr['hm_akhir'] = floatval($arr['hm_akhir'] ?? 0);
                 $arr['total_hm'] = floatval($arr['total_hm'] ?? max(0, $arr['hm_akhir'] - $arr['hm_awal']));
                 return $arr;
-            })->values()->all(),
-            'components' => $this->mapRecords(MasterComponent::all()),
-            'usersData' => $this->mapRecords(User::all()),
-            'mekanikList' => MasterMekanik::all()->map(function($m) {
+            })->values()->all(), []),
+            'components' => $this->safelyFetch(fn() => $this->mapRecords(MasterComponent::all()), []),
+            'usersData' => $this->safelyFetch(fn() => $this->mapRecords(User::all()), []),
+            'mekanikList' => $this->safelyFetch(fn() => MasterMekanik::all()->map(function($m) {
                 $arr = $m->toArray();
                 $arr['id'] = $arr['item_id'] ?? $arr['id'];
                 $arr['nama'] = $arr['nama_mekanik'] ?? ($arr['nama'] ?? ($arr['name'] ?? ''));
                 $arr['nama_mekanik'] = $arr['nama'];
                 return $arr;
-            })->values()->all(),
-            'pelaporList' => $this->mapRecords(MasterPelapor::all()),
-            'activities' => MechanicActivity::all()->map(function($a) {
+            })->values()->all(), []),
+            'pelaporList' => $this->safelyFetch(fn() => $this->mapRecords(MasterPelapor::all()), []),
+            'activities' => $this->safelyFetch(fn() => MechanicActivity::all()->map(function($a) {
                 $arr = $a->toArray();
                 $arr['id'] = $arr['item_id'] ?? $arr['id'];
                 return $arr;
-            })->values()->all(),
-            'wo' => $this->mapRecords(WorkOrder::all()),
-            'backlog' => Backlog::all()->map(function($b) {
+            })->values()->all(), []),
+            'wo' => $this->safelyFetch(fn() => $this->mapRecords(WorkOrder::all()), []),
+            'backlog' => $this->safelyFetch(fn() => Backlog::all()->map(function($b) {
                 $arr = $b->toArray();
                 $arr['id'] = $arr['item_id'] ?? $arr['id'];
                 $arr['equip_no'] = $arr['equip_no'] ?? ($arr['no_unit'] ?? '');
@@ -426,9 +575,9 @@ class MaintenanceController extends Controller
                 $arr['estimated_hours'] = $arr['est_hours'];
                 $arr['status'] = strtoupper($arr['status'] ?? 'OPEN');
                 return $arr;
-            })->values()->all(),
-            'serviceHistory' => $this->mapRecords(ServiceHistory::all()),
-            'inspections' => Inspection::orderByDesc('id')->get()->map(function($insp) {
+            })->values()->all(), []),
+            'serviceHistory' => $this->safelyFetch(fn() => $this->mapRecords(ServiceHistory::all()), []),
+            'inspections' => $this->safelyFetch(fn() => Inspection::orderByDesc('id')->get()->map(function($insp) {
                 $arr = $insp->toArray();
                 $arr['id'] = $arr['item_id'] ?? $arr['id'];
                 $decoded = json_decode($arr['checklist_json'] ?? '[]', true);
@@ -448,8 +597,8 @@ class MaintenanceController extends Controller
                     $arr['warning_count'] = 0;
                 }
                 return $arr;
-            })->values()->all(),
-            'pcr' => PcrComponent::all()->map(function($p) {
+            })->values()->all(), []),
+            'pcr' => $this->safelyFetch(fn() => PcrComponent::all()->map(function($p) {
                 $arr = $p->toArray();
                 $arr['id'] = $arr['item_id'] ?? $arr['id'];
                 
@@ -472,9 +621,9 @@ class MaintenanceController extends Controller
                     }
                 }
                 return $arr;
-            })->values()->all(),
-            'pmRecords' => $this->mapRecords(PmRecord::all()),
-            'monthlyBudget' => MonthlyBudget::all()->map(function($b) {
+            })->values()->all(), []),
+            'pmRecords' => $this->safelyFetch(fn() => $this->mapRecords(PmRecord::all()), []),
+            'monthlyBudget' => $this->safelyFetch(fn() => MonthlyBudget::all()->map(function($b) {
                 $arr = $b->toArray();
                 $arr['id'] = $arr['item_id'] ?? $arr['id'];
                 $arr['anggaran'] = $arr['budget_plan'] ?? 0;
@@ -483,10 +632,10 @@ class MaintenanceController extends Controller
                 $arr['kategori'] = $arr['category'] ?? '';
                 $arr['keterangan'] = $arr['notes'] ?? '';
                 return $arr;
-            })->values()->all(),
-            'equipmentCosts' => $this->mapRecords(EquipmentCost::all()),
+            })->values()->all(), []),
+            'equipmentCosts' => $this->safelyFetch(fn() => $this->mapRecords(EquipmentCost::all()), []),
             'equipmentProductivity' => [],
-            'farRecords' => FailureAnalysis::all()->map(function($f) {
+            'farRecords' => $this->safelyFetch(fn() => FailureAnalysis::all()->map(function($f) {
                 $arr = $f->toArray();
                 $rawId = $arr['item_id'] ?? $arr['id'];
                 $arr['id'] = $rawId;
@@ -510,8 +659,8 @@ class MaintenanceController extends Controller
                 $arr['root_cause'] = $rootCause ?: ($arr['chronology'] ?? '-');
                 $arr['pic'] = $arr['lead_investigator'] ?? ($arr['pic'] ?? ($arr['leader'] ?? '-'));
                 return $arr;
-            })->values()->all(),
-            'swabComponents' => SwabComponent::all()->map(function($s) {
+            })->values()->all(), []),
+            'swabComponents' => $this->safelyFetch(fn() => SwabComponent::all()->map(function($s) {
                 $arr = $s->toArray();
                 $arr['id'] = $arr['item_id'] ?? $arr['id'];
                 $arr['recipient_unit'] = $arr['target_unit'] ?? ($arr['recipient_unit'] ?? '');
@@ -519,8 +668,8 @@ class MaintenanceController extends Controller
                 $arr['pic'] = $arr['authorized_by'] ?? ($arr['mechanic'] ?? ($arr['pic'] ?? '-'));
                 $arr['authorized_by'] = $arr['pic'];
                 return $arr;
-            })->values()->all(),
-            'meetingNotes' => MeetingNote::all()->map(function($m) {
+            })->values()->all(), []),
+            'meetingNotes' => $this->safelyFetch(fn() => MeetingNote::all()->map(function($m) {
                 $arr = $m->toArray();
                 $arr['id'] = $arr['item_id'] ?? $arr['id'];
                 $arr['title'] = $arr['topic'] ?? ($arr['title'] ?? '');
@@ -528,17 +677,17 @@ class MaintenanceController extends Controller
                 $arr['decision'] = $arr['management_decision'] ?? ($arr['decision'] ?? '');
                 $arr['pic'] = $arr['leader'] ?? ($arr['pic'] ?? '');
                 return $arr;
-            })->values()->all(),
-            'masterTools' => $this->mapRecords(MasterTool::all()),
+            })->values()->all(), []),
+            'masterTools' => $this->safelyFetch(fn() => $this->mapRecords(MasterTool::all()), []),
             'userAccess' => $userAccessMap,
             'settings' => $this->getSettingsArray(),
             'planHours' => $planAlat,
-            'oilSamples' => $this->mapRecords(OilSample::orderByDesc('id')->get()),
-            'ppuRecords' => PpuRecord::orderByDesc('id')->get()->toArray(),
-            'maintenanceWeeks' => MaintenanceWeek::orderBy('id', 'asc')->get()->toArray(),
-            'systemLogs' => $this->mapRecords(SystemLog::orderByDesc('id')->limit(50)->get()),
-            'targetJamOperasi' => TargetJamOperasi::orderBy('section')->orderBy('equip_no')->get()->toArray(),
-            'targetJamHarian' => TargetJamHarian::all()->toArray(),
+            'oilSamples' => $this->safelyFetch(fn() => $this->mapRecords(OilSample::orderByDesc('id')->get()), []),
+            'ppuRecords' => $this->safelyFetch(fn() => PpuRecord::orderByDesc('id')->get()->toArray(), []),
+            'maintenanceWeeks' => $this->safelyFetch(fn() => MaintenanceWeek::orderBy('id', 'asc')->get()->toArray(), []),
+            'systemLogs' => $this->safelyFetch(fn() => $this->mapRecords(SystemLog::orderByDesc('id')->limit(50)->get()), []),
+            'targetJamOperasi' => $this->safelyFetch(fn() => TargetJamOperasi::orderBy('section')->orderBy('equip_no')->get()->toArray(), []),
+            'targetJamHarian' => $this->safelyFetch(fn() => TargetJamHarian::all()->toArray(), []),
         ];
     }
 

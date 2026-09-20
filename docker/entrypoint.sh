@@ -18,6 +18,9 @@ if [ ! -f "$SQLITE_DB" ]; then
     echo "Membuat file database.sqlite..."
     touch "$SQLITE_DB"
 fi
+chmod 775 /var/www/html/database 2>/dev/null || true
+chmod 666 "$SQLITE_DB"* 2>/dev/null || true
+chown -R www-data:www-data /var/www/html/database 2>/dev/null || true
 
 # 3. Inisialisasi SQLite WAL Mode untuk high concurrency
 echo "[3/9] Mengaktifkan SQLite WAL Mode & Busy Timeout 5000ms..."
@@ -69,13 +72,18 @@ fi
 
 # 5. Jalankan migrasi database & pastikan skema SQLite lengkap
 echo "[5/9] Menjalankan database migrations & sinkronisasi skema..."
+chmod 775 /var/www/html/database 2>/dev/null || true
+chmod 666 /var/www/html/database/database.sqlite* 2>/dev/null || true
+chown -R www-data:www-data /var/www/html/database 2>/dev/null || true
 sqlite3 "$SQLITE_DB" "ALTER TABLE app_users ADD COLUMN email TEXT;" 2>/dev/null || true
 sqlite3 "$SQLITE_DB" "UPDATE app_users SET email = username || '@wosys.local' WHERE email IS NULL OR email = '';" 2>/dev/null || true
-php artisan migrate --force || true
+php artisan migrate --force --no-interaction || true
 
 # 6. Jalankan seeder master data jika database baru / belum ada data
 echo "[6/9] Memeriksa status seeding database..."
-php artisan db:seed --force || true
+php artisan db:seed --force --no-interaction || true
+php artisan db:seed --class="Database\\Seeders\\OilSampleSeeder" --force --no-interaction || true
+php artisan db:seed --class="Database\\Seeders\\BasicMaintenanceHistoricalSeeder" --force --no-interaction || true
 
 # Pastikan seluruh user di database terenkripsi bcrypt dan email terisi lengkap
 php -r "require 'vendor/autoload.php'; \$app = require_once 'bootstrap/app.php'; \$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); foreach(App\Models\User::all() as \$u) { \$pass = (string)\$u->getRawOriginal('password'); if(!str_starts_with(\$pass, '\$2y\$') && !str_starts_with(\$pass, '\$2a\$')) { Illuminate\Support\Facades\DB::table('app_users')->where('id', \$u->id)->update(['password' => Illuminate\Support\Facades\Hash::make(\$pass ?: '123456')]); } if(empty(\$u->getRawOriginal('email'))) { Illuminate\Support\Facades\DB::table('app_users')->where('id', \$u->id)->update(['email' => \$u->username . '@wosys.local']); } }" || true
