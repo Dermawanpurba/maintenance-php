@@ -265,7 +265,12 @@ export const App: React.FC = () => {
                   <MonthlyBudgetView budgets={monthlyBudgets} onRefresh={loadData} />
                 )}
                 {currentTab === 'pcr' && (
-                  <PcrView pcrList={pcrList} equipments={equipments} onRefresh={loadData} />
+                  <PcrView
+                    pcrList={pcrList}
+                    equipments={equipments}
+                    dailyHms={dailyHms}
+                    onRefresh={loadData}
+                  />
                 )}
                 {currentTab === 'sos' && (
                   <ScheduledOilSamplingView

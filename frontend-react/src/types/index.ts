@@ -215,12 +215,14 @@ export interface PcrItem {
   item_id?: string;
   equip_no?: string;
   component_name?: string;
+  install_hm?: number;
   target_lifetime_hm?: number;
   current_hm?: number;
   remaining_hm?: number;
   status?: string;
   estimated_cost?: number;
   scheduled_date?: string;
+  unit_latest_hm?: number;
 }
 
 export interface SystemLogItem {

@@ -449,7 +449,30 @@ class MaintenanceController extends Controller
                 }
                 return $arr;
             })->values()->all(),
-            'pcr' => $this->mapRecords(PcrComponent::all()),
+            'pcr' => PcrComponent::all()->map(function($p) {
+                $arr = $p->toArray();
+                $arr['id'] = $arr['item_id'] ?? $arr['id'];
+                
+                // Sinkronisasi otomatis running HM dengan Daily HM terbaru
+                $equipNo = $arr['equip_no'] ?? '';
+                if (!empty($equipNo)) {
+                    $latestDaily = DailyHm::where('equip_no', $equipNo)
+                        ->orderByDesc('tanggal')
+                        ->orderByDesc('id')
+                        ->value('hm_akhir');
+                    $unitHm = $latestDaily ?? (MasterEquip::where('equip_no', $equipNo)->value('last_hm') ?? 0);
+                    
+                    if ($unitHm > 0) {
+                        $installHm = floatval($arr['install_hm'] ?? 0);
+                        $currentHm = $installHm > 0 ? max(0, $unitHm - $installHm) : max($unitHm, floatval($arr['current_hm'] ?? 0));
+                        $target = floatval($arr['target_lifetime_hm'] ?? 10000);
+                        $arr['current_hm'] = $currentHm;
+                        $arr['remaining_hm'] = max(0, $target - $currentHm);
+                        $arr['unit_latest_hm'] = $unitHm;
+                    }
+                }
+                return $arr;
+            })->values()->all(),
             'pmRecords' => $this->mapRecords(PmRecord::all()),
             'monthlyBudget' => MonthlyBudget::all()->map(function($b) {
                 $arr = $b->toArray();
@@ -772,13 +795,37 @@ class MaintenanceController extends Controller
 
         DailyHm::updateOrCreate(['item_id' => $id], $fields);
 
-        // Auto-sync HM terbaru ke MasterEquip dan TargetJamOperasi bulan berjalan
+        // Auto-sync HM terbaru ke MasterEquip, TargetJamOperasi, dan seluruh Komponen PCR terkait
         if ($hm_akhir > 0 && !empty($equip_no)) {
             MasterEquip::where('equip_no', $equip_no)->update(['last_hm' => $hm_akhir]);
             TargetJamOperasi::where('equip_no', $equip_no)
                 ->where('plan_year', intval(date('Y')))
                 ->where('plan_month', intval(date('n')))
                 ->update(['est_hm' => $hm_akhir]);
+
+            // Auto-update running HM pada seluruh komponen PCR yang terpasang di unit ini
+            $pcrComponents = PcrComponent::where('equip_no', $equip_no)->get();
+            foreach ($pcrComponents as $pcr) {
+                $installHm = floatval($pcr->install_hm ?? 0);
+                $newCurrentHm = $installHm > 0 ? max(0, $hm_akhir - $installHm) : $hm_akhir;
+                $targetLifetime = floatval($pcr->target_lifetime_hm ?? 10000);
+                $newRemaining = max(0, $targetLifetime - $newCurrentHm);
+
+                $status = $pcr->status;
+                if ($newRemaining <= 500) {
+                    $status = 'CRITICAL';
+                } elseif ($newRemaining <= 1500) {
+                    $status = 'WARNING / PERSIAPAN PR';
+                } elseif ($status === 'CRITICAL' || $status === 'WARNING / PERSIAPAN PR' || empty($status)) {
+                    $status = 'MONITORING';
+                }
+
+                $pcr->update([
+                    'current_hm' => $newCurrentHm,
+                    'remaining_hm' => $newRemaining,
+                    'status' => $status
+                ]);
+            }
         }
 
         return ['success' => true, 'message' => 'Daily HM berhasil disimpan', 'id' => $id];
@@ -1107,15 +1154,46 @@ class MaintenanceController extends Controller
     public function savePCR($data)
     {
         $id = $data['id'] ?? $data['item_id'] ?? ('PCR-' . time());
+        $equip_no = $data['equip_no'] ?? ($data['no_unit'] ?? '');
+        
+        // Ambil HM terkini unit dari Daily HM terbaru atau MasterEquip
+        $latestDailyHm = DailyHm::where('equip_no', $equip_no)
+            ->orderByDesc('tanggal')
+            ->orderByDesc('id')
+            ->value('hm_akhir');
+        $unitLastHm = $latestDailyHm ?? (MasterEquip::where('equip_no', $equip_no)->value('last_hm') ?? 0);
+
+        $targetLifetime = floatval($data['target_lifetime_hm'] ?? 10000);
+        
+        // Hitung install_hm dan current_hm otomatis
+        $installHm = isset($data['install_hm']) ? floatval($data['install_hm']) : 0;
+        $currentHm = isset($data['current_hm']) ? floatval($data['current_hm']) : 0;
+
+        if ($currentHm <= 0 && $unitLastHm > 0) {
+            $currentHm = max(0, $unitLastHm - $installHm);
+        } elseif ($installHm <= 0 && $unitLastHm > 0 && $currentHm < $unitLastHm) {
+            $installHm = max(0, $unitLastHm - $currentHm);
+        }
+
+        $remainingHm = max(0, $targetLifetime - $currentHm);
+
+        $status = $data['status'] ?? 'MONITORING';
+        if ($remainingHm <= 500 && ($status === 'MONITORING' || empty($status))) {
+            $status = 'CRITICAL';
+        } elseif ($remainingHm <= 1500 && ($status === 'MONITORING' || empty($status))) {
+            $status = 'WARNING / PERSIAPAN PR';
+        }
+
         $fields = [
             'item_id' => $id,
-            'equip_no' => $data['equip_no'] ?? '',
+            'equip_no' => $equip_no,
             'component_name' => $data['component_name'] ?? '',
-            'target_lifetime_hm' => $data['target_lifetime_hm'] ?? 0,
-            'current_hm' => $data['current_hm'] ?? 0,
-            'remaining_hm' => $data['remaining_hm'] ?? 0,
-            'status' => $data['status'] ?? 'Normal',
-            'estimated_cost' => $data['estimated_cost'] ?? 0,
+            'install_hm' => $installHm,
+            'target_lifetime_hm' => $targetLifetime,
+            'current_hm' => $currentHm,
+            'remaining_hm' => $remainingHm,
+            'status' => $status,
+            'estimated_cost' => floatval($data['estimated_cost'] ?? 0),
             'scheduled_date' => $data['scheduled_date'] ?? ''
         ];
 

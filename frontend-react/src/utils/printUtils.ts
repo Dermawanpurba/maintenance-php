@@ -1,4 +1,4 @@
-import { WorkOrder, Equipment, FARRecord, SwabRecord } from '../types';
+import { WorkOrder, Equipment, FARRecord, SwabRecord, PcrItem, DailyHM } from '../types';
 
 /**
  * Print Work Order SPK (Surat Perintah Kerja)
@@ -990,6 +990,209 @@ export function printSwabSummaryReport(swabs: SwabRecord[]) {
         <div>
           <div class="sig-role">Diperiksa Oleh:</div>
           <div class="sig-box">Maintenance Planner / Supervisor</div>
+        </div>
+        <div>
+          <div class="sig-role">Disetujui Oleh:</div>
+          <div class="sig-box">Plant Superintendent / Dept Head</div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+}
+
+/**
+ * Print Plan Component Replacement (PCR) Register & Schedule Report
+ */
+export function printPcrSummaryReport(
+  pcrList: PcrItem[],
+  equipments: Equipment[] = [],
+  dailyHms: DailyHM[] = []
+) {
+  const printWindow = window.open('', '_blank', 'width=1000,height=800');
+  if (!printWindow) {
+    alert('Harap izinkan popup browser untuk mencetak Laporan PCR');
+    return;
+  }
+
+  const todayStr = new Date().toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+
+  const totalItems = pcrList.length;
+  let criticalCount = 0;
+  let warningCount = 0;
+  let totalEstCost = 0;
+
+  pcrList.forEach(p => {
+    const remain = Number(p.remaining_hm ?? 10000);
+    if (remain <= 500) criticalCount++;
+    else if (remain <= 1500) warningCount++;
+    totalEstCost += Number(p.estimated_cost ?? 0);
+  });
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="id">
+    <head>
+      <meta charset="UTF-8">
+      <title>PCR Register & Schedule Report - PT ALAM JAYA</title>
+      <style>
+        @page { size: A4 landscape; margin: 12mm; }
+        body { font-family: 'Arial', sans-serif; color: #0f172a; margin: 0; padding: 20px; font-size: 11px; line-height: 1.4; }
+        .header { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .logo-title h1 { font-size: 16px; margin: 0; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; }
+        .logo-title h2 { font-size: 13px; margin: 3px 0 0 0; color: #ea580c; font-weight: 800; }
+        .logo-title p { font-size: 10px; margin: 2px 0 0 0; color: #64748b; }
+        .doc-badge { text-align: right; }
+        .doc-badge .doc-title { font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; }
+        .doc-badge .doc-sub { font-size: 10px; color: #64748b; margin-top: 2px; }
+        .kpi-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+        .kpi-card { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; background: #f8fafc; }
+        .kpi-title { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 2px; }
+        .kpi-val { font-size: 16px; font-weight: 800; color: #0f172a; }
+        .kpi-sub { font-size: 9px; color: #94a3b8; }
+        table.data-table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 20px; }
+        table.data-table th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #475569; font-weight: 800; }
+        table.data-table td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 10px; vertical-align: middle; }
+        .unit-badge { font-weight: 800; font-family: monospace; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; }
+        .status-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 8.5px; font-weight: 800; text-transform: uppercase; text-align: center; }
+        .status-critical { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+        .status-warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .status-monitoring { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .status-scheduled { background: #e0e7ff; color: #3730a3; border: 1px solid #a5b4fc; }
+        .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px; text-align: center; page-break-inside: avoid; }
+        .sig-box { border-top: 1px solid #94a3b8; padding-top: 6px; margin-top: 50px; font-weight: bold; font-size: 10px; }
+        .sig-role { font-size: 9px; color: #64748b; font-weight: bold; text-transform: uppercase; }
+        @media print {
+          .no-print { display: none; }
+          body { padding: 0; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="no-print" style="background:#fff7ed; border:1px solid #fed7aa; padding:10px 15px; margin-bottom:20px; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:bold; color:#c2410c;">Pratinjau Cetak Plan Component Replacement (PCR) Register</span>
+        <button onclick="window.print()" style="background:#ea580c; color:white; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">Cetak Sekarang (Print / PDF)</button>
+      </div>
+
+      <div class="header">
+        <div class="logo-title">
+          <h1>PT. ALAM JAYA COAL MINING</h1>
+          <h2>PLANT MAINTENANCE & RELIABILITY DEPARTMENT</h2>
+          <p>Sistem Informasi Manajemen Pemeliharaan Alat Berat (SIM-PAB)</p>
+        </div>
+        <div class="doc-badge">
+          <div class="doc-title">PLAN COMPONENT REPLACEMENT (PCR)</div>
+          <div class="doc-sub">Tanggal Cetak: ${todayStr}</div>
+          <div class="doc-sub" style="color: #ea580c; font-weight: bold;">Terintegrasi Otomatis dengan Daily HM & Fuel</div>
+        </div>
+      </div>
+
+      <div class="kpi-container">
+        <div class="kpi-card">
+          <div class="kpi-title">Total Komponen</div>
+          <div class="kpi-val">${totalItems} <span style="font-size: 11px; color: #64748b;">Unit</span></div>
+          <div class="kpi-sub">Major Component Terjadwal</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Kritis (&le; 500 Jam)</div>
+          <div class="kpi-val" style="color: #dc2626;">${criticalCount} <span style="font-size: 11px; color: #64748b;">Komponen</span></div>
+          <div class="kpi-sub">Wajib Segera Dieksekusi</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Mendekati Penggantian (&le; 1500 Jam)</div>
+          <div class="kpi-val" style="color: #d97706;">${warningCount} <span style="font-size: 11px; color: #64748b;">Komponen</span></div>
+          <div class="kpi-sub">Persiapan Purchase Request (PR)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Total Estimasi Budget</div>
+          <div class="kpi-val" style="color: #059669;">Rp ${totalEstCost.toLocaleString('id-ID')}</div>
+          <div class="kpi-sub">Proyeksi Anggaran Penggantian</div>
+        </div>
+      </div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 30px; text-align: center;">No</th>
+            <th style="width: 80px;">No. Unit</th>
+            <th>Nama Major Komponen</th>
+            <th style="width: 85px; text-align: right;">HM Pasang</th>
+            <th style="width: 95px; text-align: right;">HM Unit Terkini</th>
+            <th style="width: 95px; text-align: right;">Running HM</th>
+            <th style="width: 95px; text-align: right;">Target Lifetime</th>
+            <th style="width: 95px; text-align: right;">Sisa Jam</th>
+            <th style="width: 75px; text-align: center;">% Pakai</th>
+            <th style="width: 95px;">Estimasi Tgl</th>
+            <th style="width: 110px;">Status</th>
+            <th style="width: 110px; text-align: right;">Estimasi Biaya</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${pcrList.length > 0 ? pcrList.map((p, idx) => {
+            const target = Number(p.target_lifetime_hm || 10000);
+            const current = Number(p.current_hm || 0);
+            const remain = Number(p.remaining_hm ?? Math.max(0, target - current));
+            const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+            const isCritical = remain <= 500;
+            const isWarning = remain <= 1500;
+            
+            let statusClass = 'status-monitoring';
+            if (isCritical) statusClass = 'status-critical';
+            else if (isWarning) statusClass = 'status-warning';
+            else if ((p.status || '').toUpperCase() === 'SCHEDULED') statusClass = 'status-scheduled';
+
+            return `
+              <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td><span class="unit-badge">${p.equip_no || '-'}</span></td>
+                <td style="font-weight: bold; color: #0f172a;">${p.component_name || '-'}</td>
+                <td style="text-align: right; font-family: monospace;">${Number(p.install_hm || 0).toLocaleString()} Jam</td>
+                <td style="text-align: right; font-family: monospace; color: #2563eb; font-weight: bold;">
+                  ${Number(p.unit_latest_hm || current + Number(p.install_hm || 0)).toLocaleString()} Jam
+                </td>
+                <td style="text-align: right; font-family: monospace; font-weight: bold; color: #0f172a;">
+                  ${current.toLocaleString()} Jam
+                </td>
+                <td style="text-align: right; font-family: monospace;">${target.toLocaleString()} Jam</td>
+                <td style="text-align: right; font-family: monospace; font-weight: bold; color: ${isCritical ? '#dc2626' : (isWarning ? '#d97706' : '#166534')};">
+                  ${remain.toLocaleString()} Jam
+                </td>
+                <td style="text-align: center; font-weight: bold;">${pct}%</td>
+                <td>${p.scheduled_date || '-'}</td>
+                <td>
+                  <span class="status-badge ${statusClass}">
+                    ${p.status || (isCritical ? 'CRITICAL' : (isWarning ? 'WARNING' : 'MONITORING'))}
+                  </span>
+                </td>
+                <td style="text-align: right; font-family: monospace; font-weight: bold;">
+                  Rp ${Number(p.estimated_cost || 0).toLocaleString('id-ID')}
+                </td>
+              </tr>
+            `;
+          }).join('') : `
+            <tr>
+              <td colspan="12" style="text-align: center; color: #94a3b8; padding: 16px;">Tidak ada data jadwal PCR terdaftar.</td>
+            </tr>
+          `}
+        </tbody>
+      </table>
+
+      <!-- LEMBAR APPROVAL -->
+      <div class="signatures">
+        <div>
+          <div class="sig-role">Disusun Oleh:</div>
+          <div class="sig-box">Maintenance Planner</div>
+        </div>
+        <div>
+          <div class="sig-role">Diperiksa Oleh:</div>
+          <div class="sig-box">Maintenance Supervisor</div>
         </div>
         <div>
           <div class="sig-role">Disetujui Oleh:</div>
