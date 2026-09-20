@@ -557,6 +557,12 @@ class MaintenanceController extends Controller
                 });
             }
 
+            if (Schema::hasTable('master_tools') && !Schema::hasColumn('master_tools', 'borrow_date')) {
+                Schema::table('master_tools', function (Blueprint $table) {
+                    $table->string('borrow_date', 50)->nullable();
+                });
+            }
+
             if (Schema::hasTable('pcr_components') && !Schema::hasColumn('pcr_components', 'install_hm')) {
                 Schema::table('pcr_components', function (Blueprint $table) {
                     $table->double('install_hm')->nullable()->default(0);
@@ -1460,11 +1466,39 @@ class MaintenanceController extends Controller
 
     public function updateToolBorrowStatus($data)
     {
-        $id = $data['tool_id'] ?? '';
-        $status = $data['status'] ?? 'Tersedia';
-        $borrower = $data['borrower'] ?? '';
-        MasterTool::where('tool_id', $id)->update(['status' => $status, 'borrower' => $borrower]);
-        return ['success' => true, 'message' => 'Status peminjaman alat diperbarui'];
+        $id         = $data['tool_id'] ?? $data['id'] ?? '';
+        $rawStatus  = strtoupper(trim($data['status'] ?? 'AVAILABLE'));
+        $borrower   = $data['borrower'] ?? $data['borrowed_by'] ?? '';
+        $borrowDate = $data['borrow_date'] ?? null;
+
+        $isBorrowing = in_array($rawStatus, ['BORROWED', 'DIPINJAM', 'IN USE']);
+
+        if ($isBorrowing) {
+            $status     = 'BORROWED';
+            $borrowDate = !empty($borrowDate) ? $borrowDate : date('Y-m-d');
+        } else {
+            $status     = 'AVAILABLE';
+            $borrower   = null;
+            $borrowDate = null;
+        }
+
+        MasterTool::where('tool_id', $id)
+            ->orWhere('id', $id)
+            ->update([
+                'status'      => $status,
+                'borrower'    => $borrower,
+                'borrow_date' => $borrowDate,
+            ]);
+
+        $this->logAction('UpdateToolBorrow', "Status peminjaman alat {$id} -> {$status} (Peminjam: {$borrower}, Tgl: {$borrowDate})", 'WORKSHOP');
+
+        return [
+            'success'     => true,
+            'message'     => $isBorrowing ? "Alat {$id} berhasil dipinjam oleh {$borrower}" : "Alat {$id} telah dikembalikan ke rak workshop",
+            'borrow_date' => $borrowDate,
+            'status'      => $status,
+            'borrower'    => $borrower,
+        ];
     }
 
     public function deleteMasterTool($data)

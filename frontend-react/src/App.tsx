@@ -378,7 +378,7 @@ export const App: React.FC = () => {
                   <PartsStockView parts={parts} onRefresh={loadData} />
                 )}
                 {currentTab === 'tools' && (
-                  <ToolsTrackerView tools={tools} onRefresh={loadData} />
+                  <ToolsTrackerView tools={tools} mechanics={mechanics} onRefresh={loadData} />
                 )}
                 {currentTab === 'master_crew' && (
                   <MasterCrewCompView
