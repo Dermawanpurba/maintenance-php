@@ -625,34 +625,12 @@ class MaintenanceController extends Controller
                 }
 
                 if (Schema::hasTable('target_jam_operasi')) {
-                    $targetRows = TargetJamOperasi::where('est_hm', '<=', 0)->orWhereNull('est_hm')->get();
-                    foreach ($targetRows as $tr) {
-                        $no = $tr->equip_no;
-                        $latest = DailyHm::where(function($q) use ($no) {
-                            $q->where('equip_no', $no)
-                              ->orWhere('equip_no', str_replace('-', ' ', $no))
-                              ->orWhere('equip_no', str_replace(' ', '-', $no));
-                        })->orderByDesc('tanggal')->orderByDesc('id')->first();
-
-                        if ($latest && ($latest->hm_akhir > 0 || $latest->hm_awal > 0)) {
-                            $hm = floatval($latest->hm_akhir ?: $latest->hm_awal);
-                            $due1 = ceil(($hm + 1) / 250) * 250;
-                            $due2 = $due1 + 250;
-                            $calcType = function($due) {
-                                if ($due % 4000 === 0) return '4000';
-                                if ($due % 2000 === 0) return '2000';
-                                if ($due % 1000 === 0) return '1000';
-                                if ($due % 500 === 0) return '500';
-                                return '250';
-                            };
-                            $tr->update([
-                                'est_hm'                   => $hm,
-                                'next_service_hours_due'   => $due1,
-                                'next_service_hours_due_2' => $due2,
-                                'next_service_type'        => $calcType($due1),
-                                'next_service_type_2'      => $calcType($due2),
-                            ]);
-                        }
+                    $needSync = TargetJamOperasi::where('est_hm', '<=', 0)
+                        ->orWhereNull('est_hm')
+                        ->orWhereNull('next_service_date')
+                        ->exists();
+                    if ($needSync) {
+                        $this->getTargetJamOperasi(['plan_year' => 2026, 'plan_month' => 9]);
                     }
                 }
             }
@@ -2017,8 +1995,9 @@ class MaintenanceController extends Controller
         $year  = intval($data['plan_year'] ?? date('Y'));
         $month = intval($data['plan_month'] ?? date('n'));
 
-        $allEquips = MasterEquip::all();
+        $allEquips = MasterEquip::orderBy('section')->orderBy('equip_no')->get();
         $monthName = date('M-y', strtotime("{$year}-{$month}-01"));
+        $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 
         $calcType = function($due) {
             if ($due % 4000 === 0) return '4000';
@@ -2028,16 +2007,58 @@ class MaintenanceController extends Controller
             return '250';
         };
 
+        $getPmDowntime = function($type) {
+            switch ($type) {
+                case '4000': return 12;
+                case '2000': return 8;
+                case '1000': return 6;
+                case '500':  return 5;
+                case '250':  default: return 4;
+            }
+        };
+
         foreach ($allEquips as $eq) {
             $no = strtoupper(trim($eq->equip_no ?? $eq->no_unit ?? ''));
             if (empty($no)) continue;
 
-            // Pastikan est_hm selalu diambil dari catatan terbaru Daily HM & Fuel
-            $latestDaily = DailyHm::where(function($q) use ($no) {
+            $section = strtoupper($eq->section ?? ($eq->unit_type ?? 'MINING'));
+            $model   = $eq->model ?? '';
+            $status  = strtoupper($eq->status ?? 'RFU');
+
+            // 1. Cek apakah ada WorkOrder UNSCH/Breakdown yang masih aktif untuk unit ini
+            $hasOpenBD = false;
+            if (Schema::hasTable('work_orders')) {
+                $hasOpenBD = WorkOrder::where(function($q) use ($no) {
+                    $q->where('equip_no', $no)
+                      ->orWhere('equip_no', str_replace('-', ' ', $no))
+                      ->orWhere('equip_no', str_replace(' ', '-', $no));
+                })->where(function($q) {
+                    $q->where('status', 'OPEN')
+                      ->orWhere('status', 'WAITING_PART')
+                      ->orWhere('status', 'IN_PROGRESS')
+                      ->orWhere('status', 'PROGRESS')
+                      ->orWhere('status', 'BREAKDOWN');
+                })->exists();
+            }
+
+            if ($hasOpenBD) {
+                $status = 'BD';
+            } elseif (in_array($status, ['BD', 'B/D', 'BREAKDOWN']) && !$hasOpenBD) {
+                // Jika seluruh WO sudah CLOSED dan unit beroperasi aktif, status adalah RFU
+                $status = 'RFU';
+                $eq->update(['status' => 'RFU']);
+            }
+            $isBD = in_array($status, ['BD', 'B/D', 'BREAKDOWN']);
+
+            // 2. Catatan Daily HM & Fuel terbaru & rata-rata pace harian
+            $dailyQuery = DailyHm::where(function($q) use ($no) {
                 $q->where('equip_no', $no)
                   ->orWhere('equip_no', str_replace('-', ' ', $no))
                   ->orWhere('equip_no', str_replace(' ', '-', $no));
-            })->orderByDesc('tanggal')->orderByDesc('id')->first();
+            });
+
+            $latestDaily = (clone $dailyQuery)->orderByDesc('tanggal')->orderByDesc('id')->first();
+            $avgPace     = (clone $dailyQuery)->avg('total_hm');
 
             $hm = $latestDaily ? floatval($latestDaily->hm_akhir ?: $latestDaily->hm_awal) : floatval($eq->last_hm ?? 0);
 
@@ -2045,10 +2066,114 @@ class MaintenanceController extends Controller
                 $eq->update(['last_hm' => $hm]);
             }
 
-            $due1 = ceil(($hm + 1) / 250) * 250;
+            // Fallback pace harian jika belum ada log atau log = 0
+            if (!$avgPace || $avgPace <= 0) {
+                if (str_contains($section, 'HAULING') || str_starts_with($no, 'DT')) {
+                    $avgPace = 13.5;
+                } elseif (str_starts_with($no, 'EX') || str_starts_with($no, 'DZ')) {
+                    $avgPace = 14.0;
+                } else {
+                    $avgPace = 9.0;
+                }
+            }
+
+            // Reference base date untuk proyeksi
+            if ($latestDaily && !empty($latestDaily->tanggal)) {
+                $baseDate = new \DateTime($latestDaily->tanggal);
+            } else {
+                $baseDate = new \DateTime("{$year}-" . str_pad($month, 2, '0', STR_PAD_LEFT) . "-01");
+            }
+
+            $due1 = ceil(($hm + 0.1) / 250) * 250;
             $due2 = $due1 + 250;
             $type1 = $calcType($due1);
             $type2 = $calcType($due2);
+
+            $pm250 = 0; $pm500 = 0; $pm1000 = 0; $pm2000 = 0; $pm4000 = 0;
+            $downtimePm = 0;
+            $nextDate1 = null;
+            $nextDate2 = null;
+            $dailySchedule = []; // [day => ['jam' => X, 'type' => 'PM'|'BD']]
+
+            if ($isBD) {
+                // Unit Breakdown: 24 jam downtime tiap hari di bulan ini
+                for ($d = 1; $d <= $daysInMonth; $d++) {
+                    $dailySchedule[$d] = ['jam' => 24, 'type' => 'BD'];
+                }
+            } else {
+                // Unit Operasi (RFU):
+                $rem1 = max(0, $due1 - $hm);
+                $daysToDue1 = max(1, (int)round($rem1 / $avgPace));
+                $d1 = (clone $baseDate)->modify("+{$daysToDue1} days");
+                $nextDate1 = $d1->format('Y-m-d');
+
+                $daysBetween = max(5, (int)round(250 / $avgPace));
+                $d2 = (clone $d1)->modify("+{$daysBetween} days");
+                $nextDate2 = $d2->format('Y-m-d');
+
+                // Flag PM Type & Downtime untuk servis yang jatuh pada bulan yang dipilih
+                if (intval($d1->format('Y')) === $year && intval($d1->format('n')) === $month) {
+                    if ($type1 === '250') $pm250 = 1;
+                    elseif ($type1 === '500') $pm500 = 1;
+                    elseif ($type1 === '1000') $pm1000 = 1;
+                    elseif ($type1 === '2000') $pm2000 = 1;
+                    elseif ($type1 === '4000') $pm4000 = 1;
+
+                    $dt1 = $getPmDowntime($type1);
+                    $downtimePm += $dt1;
+                    $day1 = intval($d1->format('j'));
+                    $dailySchedule[$day1] = ['jam' => $dt1, 'type' => 'PM'];
+                }
+
+                if (intval($d2->format('Y')) === $year && intval($d2->format('n')) === $month) {
+                    if ($type2 === '250') $pm250 = 1;
+                    elseif ($type2 === '500') $pm500 = 1;
+                    elseif ($type2 === '1000') $pm1000 = 1;
+                    elseif ($type2 === '2000') $pm2000 = 1;
+                    elseif ($type2 === '4000') $pm4000 = 1;
+
+                    $dt2 = $getPmDowntime($type2);
+                    $downtimePm += $dt2;
+                    $day2 = intval($d2->format('j'));
+                    $dailySchedule[$day2] = [
+                        'jam'  => ($dailySchedule[$day2]['jam'] ?? 0) + $dt2,
+                        'type' => 'PM',
+                    ];
+                }
+            }
+
+            // Hitung open backlog jika ada
+            $downtimeBacklog = 0;
+            if (Schema::hasTable('backlogs')) {
+                $downtimeBacklog = floatval(Backlog::where(function($q) use ($no) {
+                    $q->where('equip_no', $no)->orWhere('equip_no', str_replace('-', ' ', $no));
+                })->where('status', '!=', 'CLOSED')->sum('est_hours'));
+            }
+
+            $targetData = [
+                'equip_no'                 => $no,
+                'section'                  => $section,
+                'model'                    => $model,
+                'est_hm'                   => $hm,
+                'est_hm_date'              => "01-{$monthName}",
+                'status'                   => $status,
+                'next_service_hours_due'   => $due1,
+                'next_service_hours_due_2' => $due2,
+                'next_service_type_hm'     => floatval($type1),
+                'next_service_type'        => $type1,
+                'next_service_type_2'      => $type2,
+                'next_service_date'        => $nextDate1,
+                'next_service_date_2'      => $nextDate2,
+                'pm_250'                   => $pm250,
+                'pm_500'                   => $pm500,
+                'pm_1000'                  => $pm1000,
+                'pm_2000'                  => $pm2000,
+                'pm_4000'                  => $pm4000,
+                'downtime_pm'              => $downtimePm,
+                'downtime_backlog'         => $downtimeBacklog,
+                'plan_year'                => $year,
+                'plan_month'               => $month,
+            ];
 
             $existing = TargetJamOperasi::where('equip_no', $no)
                 ->where('plan_year', $year)
@@ -2056,40 +2181,30 @@ class MaintenanceController extends Controller
                 ->first();
 
             if ($existing) {
-                // Selalu perbarui jika est_hm masih 0 atau terdapat pembacaan Daily HM yang valid
-                if ((floatval($existing->est_hm) <= 0 || floatval($existing->est_hm) < $hm) && $hm > 0) {
-                    $existing->update([
-                        'est_hm'                   => $hm,
-                        'next_service_hours_due'   => $due1,
-                        'next_service_hours_due_2' => $due2,
-                        'next_service_type'        => $type1,
-                        'next_service_type_2'      => $type2,
+                $existing->update($targetData);
+            } else {
+                $targetData['downtime_midlife'] = 0;
+                $targetData['downtime_pcr']     = 0;
+                TargetJamOperasi::create($targetData);
+            }
+
+            // Pastikan tabel target_jam_harian memiliki jadwal harian PM / BD jika belum ada entri manual
+            $harianCount = TargetJamHarian::where('equip_no', $no)
+                ->where('plan_year', $year)
+                ->where('plan_month', $month)
+                ->count();
+
+            if ($harianCount === 0 && !empty($dailySchedule)) {
+                foreach ($dailySchedule as $day => $info) {
+                    TargetJamHarian::create([
+                        'equip_no'      => $no,
+                        'plan_year'     => $year,
+                        'plan_month'    => $month,
+                        'plan_day'      => $day,
+                        'jam_rencana'   => $info['jam'],
+                        'downtime_type' => $info['type'],
                     ]);
                 }
-            } else {
-                TargetJamOperasi::create([
-                    'equip_no'                 => $no,
-                    'section'                  => $eq->section ?? ($eq->unit_type ?? 'MINING'),
-                    'model'                    => $eq->model ?? '',
-                    'est_hm'                   => $hm,
-                    'est_hm_date'              => "01-{$monthName}",
-                    'status'                   => strtoupper($eq->status ?? 'RFU'),
-                    'next_service_hours_due'   => $due1,
-                    'next_service_hours_due_2' => $due2,
-                    'next_service_type'        => $type1,
-                    'next_service_type_2'      => $type2,
-                    'pm_250'                   => $type1 === '250' ? 1 : 0,
-                    'pm_500'                   => $type1 === '500' ? 1 : 0,
-                    'pm_1000'                  => $type1 === '1000' ? 1 : 0,
-                    'pm_2000'                  => $type1 === '2000' ? 1 : 0,
-                    'pm_4000'                  => $type1 === '4000' ? 1 : 0,
-                    'downtime_pm'              => 0,
-                    'downtime_backlog'         => 0,
-                    'downtime_midlife'         => 0,
-                    'downtime_pcr'             => 0,
-                    'plan_year'                => $year,
-                    'plan_month'               => $month,
-                ]);
             }
         }
 
@@ -2106,9 +2221,9 @@ class MaintenanceController extends Controller
                     ->toArray();
 
         return [
-            'success'           => true,
-            'targetJamOperasi'  => $rows,
-            'targetJamHarian'   => $harian,
+            'success'          => true,
+            'targetJamOperasi' => $rows,
+            'targetJamHarian'  => $harian,
         ];
     }
 
@@ -2272,162 +2387,28 @@ class MaintenanceController extends Controller
 
     public function seedDemoTargetJam($data)
     {
-        $year = intval($data['plan_year'] ?? 2026);
+        $year  = intval($data['plan_year'] ?? 2026);
         $month = intval($data['plan_month'] ?? 9);
 
-        $units = [
-            [
-                'section' => 'MINING', 'equip_no' => 'DZ 201', 'model' => 'D85ESS-2', 'est_hm' => 46700, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 47000, 'next_service_hours_due_2' => 47250,
-                'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2026-09-18', 'next_service_date_2' => '2026-10-09',
-                'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 6, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [17 => 24, 18 => 24]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'DZ 222', 'model' => 'D85ESS-2', 'est_hm' => 49000, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 49250, 'next_service_hours_due_2' => 49500,
-                'next_service_type' => '250', 'next_service_type_2' => '500',
-                'next_service_date' => '2026-09-13', 'next_service_date_2' => '2026-10-04',
-                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 5, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [13 => 5]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'DZ 273', 'model' => 'D85ESS-2', 'est_hm' => 43900, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 44000, 'next_service_hours_due_2' => 44250,
-                'next_service_type' => '4000', 'next_service_type_2' => '250',
-                'next_service_date' => '2026-09-09', 'next_service_date_2' => '2026-09-30',
-                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 1,
-                'downtime_pm' => 17, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [10 => 12, 29 => 24, 30 => 24]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'DZ 281', 'model' => 'D85ESS-2', 'est_hm' => 45700, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 45750, 'next_service_hours_due_2' => 46000,
-                'next_service_type' => '250', 'next_service_type_2' => '2000',
-                'next_service_date' => '2026-09-04', 'next_service_date_2' => '2026-09-25',
-                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 1, 'pm_4000' => 0,
-                'downtime_pm' => 13, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [5 => 5, 26 => 24, 27 => 24, 28 => 24]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'DZ 294', 'model' => 'D85ESS-2', 'est_hm' => 46200, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 46250, 'next_service_hours_due_2' => 46500,
-                'next_service_type' => '250', 'next_service_type_2' => '500',
-                'next_service_date' => '2026-09-01', 'next_service_date_2' => '2026-09-22',
-                'pm_250' => 1, 'pm_500' => 1, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 5, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [2 => 24, 3 => 24, 4 => 24, 5 => 24, 6 => 24, 7 => 24, 8 => 24, 9 => 24, 10 => 24, 11 => 24, 12 => 24, 13 => 24, 14 => 24, 15 => 24, 16 => 24, 17 => 24, 18 => 24, 22 => 5]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'DZ 331', 'model' => 'D85ESS-2', 'est_hm' => 40800, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 41000, 'next_service_hours_due_2' => 41250,
-                'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2026-09-14', 'next_service_date_2' => '2026-10-05',
-                'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 6, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [15 => 24, 16 => 24]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'DZ 365', 'model' => 'D85ESS-2', 'est_hm' => 46900, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 47000, 'next_service_hours_due_2' => 47250,
-                'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2026-09-08', 'next_service_date_2' => '2026-09-29',
-                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 11, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [7 => 6, 30 => 5]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'DZ 373', 'model' => 'D65P-12', 'est_hm' => 4702, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 4750, 'next_service_hours_due_2' => 5000,
-                'next_service_type' => '250', 'next_service_type_2' => '1000',
-                'next_service_date' => '2026-09-05', 'next_service_date_2' => '2026-09-25',
-                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 9, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [5 => 24, 6 => 24, 25 => 6]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'DZ 393', 'model' => 'D65P-12', 'est_hm' => 1752, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 2000, 'next_service_hours_due_2' => 2250,
-                'next_service_type' => '2000', 'next_service_type_2' => '250',
-                'next_service_date' => '2026-09-21', 'next_service_date_2' => '2026-10-12',
-                'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 1, 'pm_4000' => 0,
-                'downtime_pm' => 8, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [19 => 24, 20 => 24, 21 => 24]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'DZ 422', 'model' => 'D65P-12', 'est_hm' => 774, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 1000, 'next_service_hours_due_2' => 1250,
-                'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2026-09-19', 'next_service_date_2' => '2026-10-10',
-                'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 6, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [18 => 6]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'MG 081', 'model' => 'GD535', 'est_hm' => 12984, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 13000, 'next_service_hours_due_2' => 13250,
-                'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2026-09-02', 'next_service_date_2' => '2026-09-23',
-                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 9, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [2 => 24, 3 => 24, 22 => 3]
-            ],
-            [
-                'section' => 'HAULING', 'equip_no' => 'MG 123', 'model' => 'GD535', 'est_hm' => 17493, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 17500, 'next_service_hours_due_2' => 17750,
-                'next_service_type' => '500', 'next_service_type_2' => '250',
-                'next_service_date' => '2026-09-01', 'next_service_date_2' => '2026-09-22',
-                'pm_250' => 0, 'pm_500' => 1, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 3, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [21 => 24, 22 => 24]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'MG 212', 'model' => 'GD535', 'est_hm' => 995, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
-                'next_service_hours_due' => 1000, 'next_service_hours_due_2' => 1250,
-                'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2026-09-01', 'next_service_date_2' => '2026-09-22',
-                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 3, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => [22 => 3]
-            ],
-            [
-                'section' => 'MINING', 'equip_no' => 'VB 124', 'model' => 'BW211D-40', 'est_hm' => 8388, 'est_hm_date' => '01-Sep-26', 'status' => 'BD',
-                'next_service_hours_due' => 8500, 'next_service_hours_due_2' => 8750,
-                'next_service_type' => '500', 'next_service_type_2' => '250',
-                'next_service_date' => null, 'next_service_date_2' => null,
-                'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
-                'downtime_pm' => 0, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => array_fill_keys(range(1, 20), 24)
-            ]
-        ];
+        // Hapus jam harian lama untuk periode ini agar di-generate ulang dengan jadwal aktual
+        TargetJamHarian::where('plan_year', $year)
+            ->where('plan_month', $month)
+            ->delete();
 
-        foreach ($units as $u) {
-            $daily = $u['daily'] ?? [];
-            unset($u['daily']);
-            $u['plan_year'] = $year;
-            $u['plan_month'] = $month;
+        // Hapus unit dummy lama yang bukan armada riil jika ada
+        TargetJamOperasi::where('plan_year', $year)
+            ->where('plan_month', $month)
+            ->where('equip_no', 'like', 'DZ %')
+            ->delete();
 
-            TargetJamOperasi::updateOrCreate(
-                ['equip_no' => $u['equip_no'], 'plan_year' => $year, 'plan_month' => $month],
-                $u
-            );
+        // Jalankan getTargetJamOperasi untuk generate ulang seluruh 34 unit armada riil
+        $fresh = $this->getTargetJamOperasi(['plan_year' => $year, 'plan_month' => $month]);
 
-            foreach ($daily as $day => $jam) {
-                TargetJamHarian::updateOrCreate(
-                    ['equip_no' => $u['equip_no'], 'plan_year' => $year, 'plan_month' => $month, 'plan_day' => $day],
-                    ['jam_rencana' => $jam, 'downtime_type' => ($jam == 24 ? 'BD' : 'PM')]
-                );
-            }
-        }
-
-        $this->logAction('SeedDemoTargetJam', "Memuat 14 data riil screenshot Juni 2024", 'PLANNER');
+        $this->logAction('SeedDemoTargetJam', "Sinkronisasi seluruh jadwal servis armada aktual bulan {$month}/{$year}", 'PLANNER');
         return [
             'success' => true,
-            'message' => 'Data Schedule Service & Downtime Gantt Juni 2024 berhasil dimuat (14 Unit)',
-            'data'    => $this->getTargetJamOperasi(['plan_year' => $year, 'plan_month' => $month])
+            'message' => "Data Schedule Service & Downtime Gantt Matrix berhasil disinkronkan dengan data riil seluruh unit armada ({$month}/{$year})",
+            'data'    => $fresh
         ];
     }
 }
