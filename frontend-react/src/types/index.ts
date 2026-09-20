@@ -7,8 +7,10 @@ export interface Equipment {
   unit_type?: string;
   model: string;
   lokasi: string;
+  site?: string;
   status: string; // READY, BREAKDOWN, STANDBY, MAINTENANCE
   last_hm: number;
+  hm_km?: number | string;
   serial_number?: string;
   brand?: string;
   warranty_status?: string;
@@ -126,13 +128,21 @@ export interface ToolItem {
 
 export interface SwabRecord {
   id?: number | string;
+  item_id?: string;
   tanggal: string;
   component_name: string;
   donor_unit: string;
   recipient_unit: string;
+  target_unit?: string;
   reason: string;
   status: string;
   pic: string;
+  authorized_by?: string;
+  mechanic?: string;
+  restoration_date?: string;
+  target_date?: string;
+  supervisor?: string;
+  approved_by?: string;
 }
 
 export interface FARRecord {
@@ -145,16 +155,23 @@ export interface FARRecord {
   equip_no?: string;
   damage_part?: string;
   component?: string;
+  component_name?: string;
   root_cause?: string;
+  failure_mode?: string;
   why1?: string;
   why2?: string;
   why3?: string;
   why4?: string;
   why5?: string;
+  five_why_json?: string | string[];
   corrective_action?: string;
   preventive_action?: string;
   pic?: string;
   leader?: string;
+  lead_investigator?: string;
+  supervisor?: string;
+  approved_by?: string;
+  status?: string;
 }
 
 export interface MeetingNote {

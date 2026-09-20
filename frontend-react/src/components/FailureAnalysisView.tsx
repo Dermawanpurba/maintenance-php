@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { FileSpreadsheet, Plus, Search, AlertOctagon, X, AlertTriangle, Eye, Trash2, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { FileSpreadsheet, Plus, Search, AlertOctagon, X, AlertTriangle, Eye, Trash2, ShieldAlert, CheckCircle2, Printer } from 'lucide-react';
 import { FARRecord, Equipment } from '../types';
 import { api } from '../services/api';
+import { printFARDocument, printFARSummaryReport } from '../utils/printUtils';
 
 interface FailureAnalysisViewProps {
   fars: FARRecord[];
@@ -122,14 +123,26 @@ export const FailureAnalysisView: React.FC<FailureAnalysisViewProps> = ({ fars, 
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md shadow-red-600/20 transition-all active:scale-95 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Buat Laporan FAR (5-Why)</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => printFARSummaryReport(filtered)}
+            className="flex items-center justify-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
+            title="Cetak Rekapitulasi Laporan FAR Periode Berjalan"
+          >
+            <Printer className="w-4 h-4 text-slate-300" />
+            <span>Cetak Rekap PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md shadow-red-600/20 transition-all active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Buat Laporan FAR (5-Why)</span>
+          </button>
+        </div>
       </div>
 
       {/* FAR Table Card */}
@@ -164,6 +177,7 @@ export const FailureAnalysisView: React.FC<FailureAnalysisViewProps> = ({ fars, 
                   const farNumber = rawId.startsWith('FAR-') ? rawId : (rawId ? `FAR-${rawId}` : '-');
                   const rca = far.root_cause || (far as any).chronology || '-';
                   const investigator = far.pic || far.leader || (far as any).lead_investigator || '-';
+                  const matchedEq = equipments.find(e => (e.equip_no || e.no_unit) === eq);
 
                   return (
                     <tr key={far.id || idx} className="hover:bg-slate-50/80 transition-colors">
@@ -188,15 +202,22 @@ export const FailureAnalysisView: React.FC<FailureAnalysisViewProps> = ({ fars, 
                         <div className="flex items-center justify-center space-x-1.5">
                           <button
                             onClick={() => setSelectedFAR(far)}
-                            title="Lihat Detail 5-Why RCA"
-                            className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors"
+                            title="Lihat Detail 5-Why RCA & Approval"
+                            className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
                           <button
+                            onClick={() => printFARDocument(far, matchedEq)}
+                            title="Cetak Dokumen FAR PDF & Lembar Approval"
+                            className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors cursor-pointer"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+                          <button
                             onClick={() => handleDelete(far.id)}
                             title="Hapus FAR"
-                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -227,7 +248,7 @@ export const FailureAnalysisView: React.FC<FailureAnalysisViewProps> = ({ fars, 
                   <p className="text-xs text-slate-400">Unit: {selectedFAR.equip_no || selectedFAR.no_unit} • Komponen: {selectedFAR.damage_part || selectedFAR.component || (selectedFAR as any).component_name}</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedFAR(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+              <button onClick={() => setSelectedFAR(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -250,16 +271,60 @@ export const FailureAnalysisView: React.FC<FailureAnalysisViewProps> = ({ fars, 
                 </div>
               )}
 
+              {/* Status Lembar Pengesahan & Tanda Tangan Approval */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-700 text-[11px] uppercase tracking-wider block">
+                    Lembar Pengesahan & Tanda Tangan Approval (Resmi):
+                  </span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md">
+                    Format Siap Cetak PDF
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-center text-[11px]">
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
+                    <span className="text-slate-400 block text-[9.5px] uppercase font-bold">1. Investigator</span>
+                    <span className="font-bold text-slate-800 block truncate mt-0.5">{selectedFAR.pic || selectedFAR.leader || (selectedFAR as any).lead_investigator || 'Hariadi'}</span>
+                    <span className="text-[9.5px] text-slate-500 block">Lead Mekanik</span>
+                    <span className="inline-block mt-1.5 text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-2 py-0.5 rounded">Diselidiki</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
+                    <span className="text-slate-400 block text-[9.5px] uppercase font-bold">2. Planner / Spv</span>
+                    <span className="font-bold text-slate-800 block truncate mt-0.5">{selectedFAR.supervisor || 'Workshop Supervisor'}</span>
+                    <span className="text-[9.5px] text-slate-500 block">Supervisor Site</span>
+                    <span className="inline-block mt-1.5 text-[9px] bg-blue-50 text-blue-700 border border-blue-200 font-bold px-2 py-0.5 rounded">Diverifikasi</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
+                    <span className="text-slate-400 block text-[9.5px] uppercase font-bold">3. Plant Head</span>
+                    <span className="font-bold text-slate-800 block truncate mt-0.5">{selectedFAR.approved_by || 'Plant Superintendent'}</span>
+                    <span className="text-[9.5px] text-slate-500 block">Dept Head</span>
+                    <span className="inline-block mt-1.5 text-[9px] bg-purple-50 text-purple-700 border border-purple-200 font-bold px-2 py-0.5 rounded">Disetujui</span>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-between items-center pt-2 text-slate-400 text-[11px]">
                 <span>Investigator: <strong>{selectedFAR.pic || selectedFAR.leader || 'Tim Reliability'}</strong></span>
                 <span>Tanggal Insiden: <strong>{selectedFAR.incident_date || selectedFAR.tanggal}</strong></span>
               </div>
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-slate-100">
+            <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const eq = equipments.find(e => (e.equip_no || e.no_unit) === (selectedFAR.equip_no || selectedFAR.no_unit));
+                  printFARDocument(selectedFAR, eq);
+                }}
+                className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-600/20 active:scale-95 cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Cetak Dokumen PDF & Approval</span>
+              </button>
+
               <button
                 onClick={() => setSelectedFAR(null)}
-                className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs"
+                className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
               >
                 Tutup Pratinjau
               </button>
