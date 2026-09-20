@@ -1090,7 +1090,7 @@ export const TargetJamOperasiView: React.FC<Props> = ({
 
                       {/* Est. HM */}
                       <td className="border border-slate-300 dark:border-slate-700 px-2 py-1.5 text-center font-bold text-slate-800 dark:text-slate-200">
-                        {formatNumber(row.est_hm)}
+                        {formatNumber(row.est_hm || (equipments.find(e => (e.equip_no || e.no_unit) === row.equip_no)?.last_hm || 0))}
                       </td>
 
                       {/* STATUS */}

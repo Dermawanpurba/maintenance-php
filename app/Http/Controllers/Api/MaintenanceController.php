@@ -602,6 +602,64 @@ class MaintenanceController extends Controller
             Log::warning('Seeder execution warning: ' . $e->getMessage());
         }
 
+        // 5. Pastikan MasterEquip.last_hm dan TargetJamOperasi.est_hm sinkron dari catatan Daily HM & Fuel terbaru
+        try {
+            if (Schema::hasTable('daily_hms')) {
+                if (Schema::hasTable('master_equips')) {
+                    $equips = MasterEquip::all();
+                    foreach ($equips as $eq) {
+                        $no = $eq->equip_no ?? $eq->no_unit;
+                        $latest = DailyHm::where(function($q) use ($no) {
+                            $q->where('equip_no', $no)
+                              ->orWhere('equip_no', str_replace('-', ' ', $no))
+                              ->orWhere('equip_no', str_replace(' ', '-', $no));
+                        })->orderByDesc('tanggal')->orderByDesc('id')->first();
+
+                        if ($latest && ($latest->hm_akhir > 0 || $latest->hm_awal > 0)) {
+                            $hm = floatval($latest->hm_akhir ?: $latest->hm_awal);
+                            if (floatval($eq->last_hm ?? 0) != $hm) {
+                                $eq->update(['last_hm' => $hm]);
+                            }
+                        }
+                    }
+                }
+
+                if (Schema::hasTable('target_jam_operasi')) {
+                    $targetRows = TargetJamOperasi::where('est_hm', '<=', 0)->orWhereNull('est_hm')->get();
+                    foreach ($targetRows as $tr) {
+                        $no = $tr->equip_no;
+                        $latest = DailyHm::where(function($q) use ($no) {
+                            $q->where('equip_no', $no)
+                              ->orWhere('equip_no', str_replace('-', ' ', $no))
+                              ->orWhere('equip_no', str_replace(' ', '-', $no));
+                        })->orderByDesc('tanggal')->orderByDesc('id')->first();
+
+                        if ($latest && ($latest->hm_akhir > 0 || $latest->hm_awal > 0)) {
+                            $hm = floatval($latest->hm_akhir ?: $latest->hm_awal);
+                            $due1 = ceil(($hm + 1) / 250) * 250;
+                            $due2 = $due1 + 250;
+                            $calcType = function($due) {
+                                if ($due % 4000 === 0) return '4000';
+                                if ($due % 2000 === 0) return '2000';
+                                if ($due % 1000 === 0) return '1000';
+                                if ($due % 500 === 0) return '500';
+                                return '250';
+                            };
+                            $tr->update([
+                                'est_hm'                   => $hm,
+                                'next_service_hours_due'   => $due1,
+                                'next_service_hours_due_2' => $due2,
+                                'next_service_type'        => $calcType($due1),
+                                'next_service_type_2'      => $calcType($due2),
+                            ]);
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Sync DailyHm to MasterEquip and TargetJamOperasi notice: ' . $e->getMessage());
+        }
+
         $checked = true;
     }
 
@@ -1137,10 +1195,36 @@ class MaintenanceController extends Controller
         // Auto-sync HM terbaru ke MasterEquip, TargetJamOperasi, dan seluruh Komponen PCR terkait
         if ($hm_akhir > 0 && !empty($equip_no)) {
             MasterEquip::where('equip_no', $equip_no)->update(['last_hm' => $hm_akhir]);
+
+            $due1 = ceil(($hm_akhir + 1) / 250) * 250;
+            $due2 = $due1 + 250;
+            $calcType = function($due) {
+                if ($due % 4000 === 0) return '4000';
+                if ($due % 2000 === 0) return '2000';
+                if ($due % 1000 === 0) return '1000';
+                if ($due % 500 === 0) return '500';
+                return '250';
+            };
+
+            $tgl = $data['tanggal'] ?? date('Y-m-d');
+            $year = intval(date('Y', strtotime($tgl)));
+            $month = intval(date('n', strtotime($tgl)));
+
             TargetJamOperasi::where('equip_no', $equip_no)
-                ->where('plan_year', intval(date('Y')))
-                ->where('plan_month', intval(date('n')))
-                ->update(['est_hm' => $hm_akhir]);
+                ->where(function($q) use ($year, $month) {
+                    $q->where(function($sq) use ($year, $month) {
+                        $sq->where('plan_year', $year)->where('plan_month', $month);
+                    })->orWhere(function($sq) {
+                        $sq->where('plan_year', intval(date('Y')))->where('plan_month', intval(date('n')));
+                    });
+                })
+                ->update([
+                    'est_hm'                   => $hm_akhir,
+                    'next_service_hours_due'   => $due1,
+                    'next_service_hours_due_2' => $due2,
+                    'next_service_type'        => $calcType($due1),
+                    'next_service_type_2'      => $calcType($due2),
+                ]);
 
             // Auto-update running HM pada seluruh komponen PCR yang terpasang di unit ini
             $pcrComponents = PcrComponent::where('equip_no', $equip_no)->get();
@@ -1933,59 +2017,80 @@ class MaintenanceController extends Controller
         $year  = intval($data['plan_year'] ?? date('Y'));
         $month = intval($data['plan_month'] ?? date('n'));
 
-        // Auto-sync: Daftarkan unit dari MasterEquip yang belum ada di TargetJamOperasi pada periode ini
-        $existingNos = TargetJamOperasi::where('plan_year', $year)
-                        ->where('plan_month', $month)
-                        ->pluck('equip_no')
-                        ->map(fn($x) => strtoupper(trim($x)))
-                        ->toArray();
-
         $allEquips = MasterEquip::all();
         $monthName = date('M-y', strtotime("{$year}-{$month}-01"));
 
+        $calcType = function($due) {
+            if ($due % 4000 === 0) return '4000';
+            if ($due % 2000 === 0) return '2000';
+            if ($due % 1000 === 0) return '1000';
+            if ($due % 500 === 0) return '500';
+            return '250';
+        };
+
         foreach ($allEquips as $eq) {
             $no = strtoupper(trim($eq->equip_no ?? $eq->no_unit ?? ''));
-            if (empty($no) || in_array($no, $existingNos)) continue;
+            if (empty($no)) continue;
 
-            $lastHm = floatval($eq->last_hm ?? 0);
-            $due1 = ceil(($lastHm + 1) / 250) * 250;
+            // Pastikan est_hm selalu diambil dari catatan terbaru Daily HM & Fuel
+            $latestDaily = DailyHm::where(function($q) use ($no) {
+                $q->where('equip_no', $no)
+                  ->orWhere('equip_no', str_replace('-', ' ', $no))
+                  ->orWhere('equip_no', str_replace(' ', '-', $no));
+            })->orderByDesc('tanggal')->orderByDesc('id')->first();
+
+            $hm = $latestDaily ? floatval($latestDaily->hm_akhir ?: $latestDaily->hm_awal) : floatval($eq->last_hm ?? 0);
+
+            if ($hm > 0 && floatval($eq->last_hm ?? 0) != $hm) {
+                $eq->update(['last_hm' => $hm]);
+            }
+
+            $due1 = ceil(($hm + 1) / 250) * 250;
             $due2 = $due1 + 250;
-
-            $calcType = function($due) {
-                if ($due % 4000 === 0) return '4000';
-                if ($due % 2000 === 0) return '2000';
-                if ($due % 1000 === 0) return '1000';
-                if ($due % 500 === 0) return '500';
-                return '250';
-            };
-
             $type1 = $calcType($due1);
             $type2 = $calcType($due2);
 
-            TargetJamOperasi::create([
-                'equip_no'                 => $no,
-                'section'                  => $eq->section ?? ($eq->unit_type ?? 'MINING'),
-                'model'                    => $eq->model ?? '',
-                'est_hm'                   => $lastHm,
-                'est_hm_date'              => "01-{$monthName}",
-                'status'                   => strtoupper($eq->status ?? 'RFU'),
-                'next_service_hours_due'   => $due1,
-                'next_service_hours_due_2' => $due2,
-                'next_service_type'        => $type1,
-                'next_service_type_2'      => $type2,
-                'pm_250'                   => $type1 === '250' ? 1 : 0,
-                'pm_500'                   => $type1 === '500' ? 1 : 0,
-                'pm_1000'                  => $type1 === '1000' ? 1 : 0,
-                'pm_2000'                  => $type1 === '2000' ? 1 : 0,
-                'pm_4000'                  => $type1 === '4000' ? 1 : 0,
-                'downtime_pm'              => 0,
-                'downtime_backlog'         => 0,
-                'downtime_midlife'         => 0,
-                'downtime_pcr'             => 0,
-                'plan_year'                => $year,
-                'plan_month'               => $month,
-            ]);
-            $existingNos[] = $no;
+            $existing = TargetJamOperasi::where('equip_no', $no)
+                ->where('plan_year', $year)
+                ->where('plan_month', $month)
+                ->first();
+
+            if ($existing) {
+                // Selalu perbarui jika est_hm masih 0 atau terdapat pembacaan Daily HM yang valid
+                if ((floatval($existing->est_hm) <= 0 || floatval($existing->est_hm) < $hm) && $hm > 0) {
+                    $existing->update([
+                        'est_hm'                   => $hm,
+                        'next_service_hours_due'   => $due1,
+                        'next_service_hours_due_2' => $due2,
+                        'next_service_type'        => $type1,
+                        'next_service_type_2'      => $type2,
+                    ]);
+                }
+            } else {
+                TargetJamOperasi::create([
+                    'equip_no'                 => $no,
+                    'section'                  => $eq->section ?? ($eq->unit_type ?? 'MINING'),
+                    'model'                    => $eq->model ?? '',
+                    'est_hm'                   => $hm,
+                    'est_hm_date'              => "01-{$monthName}",
+                    'status'                   => strtoupper($eq->status ?? 'RFU'),
+                    'next_service_hours_due'   => $due1,
+                    'next_service_hours_due_2' => $due2,
+                    'next_service_type'        => $type1,
+                    'next_service_type_2'      => $type2,
+                    'pm_250'                   => $type1 === '250' ? 1 : 0,
+                    'pm_500'                   => $type1 === '500' ? 1 : 0,
+                    'pm_1000'                  => $type1 === '1000' ? 1 : 0,
+                    'pm_2000'                  => $type1 === '2000' ? 1 : 0,
+                    'pm_4000'                  => $type1 === '4000' ? 1 : 0,
+                    'downtime_pm'              => 0,
+                    'downtime_backlog'         => 0,
+                    'downtime_midlife'         => 0,
+                    'downtime_pcr'             => 0,
+                    'plan_year'                => $year,
+                    'plan_month'               => $month,
+                ]);
+            }
         }
 
         $rows   = TargetJamOperasi::where('plan_year', $year)
