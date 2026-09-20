@@ -47,8 +47,8 @@ export const api = {
     return this.postAction('saveWorkOrder', data);
   },
 
-  async updateWOStatus(no_wo: string, status: string) {
-    return this.postAction('updateWOStatus', { no_wo, status });
+  async updateWOStatus(no_wo: string, status: string, closureData: Record<string, any> = {}) {
+    return this.postAction('updateWOStatus', { no_wo, status, ...closureData });
   },
 
   async deleteWO(no_wo: string) {

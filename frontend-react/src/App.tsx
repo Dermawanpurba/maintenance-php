@@ -345,6 +345,7 @@ export const App: React.FC = () => {
                   <WorkOrdersView
                     workOrders={workOrders}
                     equipments={equipments}
+                    mechanics={mechanics}
                     onRefresh={loadData}
                   />
                 )}

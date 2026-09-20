@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Wrench, Plus, Search, Printer, Trash2, Edit3, X, AlertTriangle, ShieldAlert, CheckCircle2, ChevronDown } from 'lucide-react';
-import { WorkOrder, Equipment, PartItem } from '../types';
+import { Wrench, Plus, Search, Printer, Trash2, Edit3, X, AlertTriangle, ShieldAlert, CheckCircle2, Clock3 } from 'lucide-react';
+import { WorkOrder, Equipment, MasterMekanik } from '../types';
 import { api } from '../services/api';
 import { printWorkOrderSPK } from '../utils/printUtils';
 
 interface WorkOrdersViewProps {
   workOrders: WorkOrder[];
   equipments: Equipment[];
+  mechanics: MasterMekanik[];
   onRefresh: () => void;
 }
 
@@ -27,6 +28,7 @@ const normalizeBreakdownClass = (value?: string): 'BREAKDOWN SCHEDULED' | 'BREAK
 export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
   workOrders,
   equipments,
+  mechanics,
   onRefresh
 }) => {
   const [search, setSearch] = useState('');
@@ -36,8 +38,16 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBDModalOpen, setIsBDModalOpen] = useState(false);
+  const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedClosureWO, setSelectedClosureWO] = useState<WorkOrder | null>(null);
+  const [closureForm, setClosureForm] = useState({
+    action_log: '',
+    tgl_selesai: new Date().toISOString().split('T')[0],
+    jam_selesai: new Date().toTimeString().slice(0, 5),
+    tech: ''
+  });
 
   // Quick Breakdown Awal Form State
   const [bdForm, setBdForm] = useState({
@@ -183,9 +193,25 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
     setPartRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));
   };
 
-  const handleStatusChange = async (no_wo: string, newStatus: string) => {
+  const openClosureModal = (wo: WorkOrder) => {
+    setSelectedClosureWO(wo);
+    setClosureForm({
+      action_log: wo.action_log || '',
+      tgl_selesai: wo.tgl_selesai || new Date().toISOString().split('T')[0],
+      jam_selesai: wo.jam_selesai || new Date().toTimeString().slice(0, 5),
+      tech: wo.tech || wo.mekanik || ''
+    });
+    setIsClosureModalOpen(true);
+  };
+
+  const handleStatusChange = async (wo: WorkOrder, newStatus: string) => {
+    if (newStatus === 'CLOSED') {
+      openClosureModal(wo);
+      return;
+    }
+
     try {
-      const res = await api.updateWOStatus(no_wo, newStatus);
+      const res = await api.updateWOStatus(wo.no_wo, newStatus);
       if (res.success) {
         onRefresh();
       } else {
@@ -193,6 +219,40 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
       }
     } catch (err: any) {
       alert('Error: ' + err.message);
+    }
+  };
+
+  const handleCloseWorkOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClosureWO) return;
+    if (!closureForm.action_log.trim() || !closureForm.tgl_selesai || !closureForm.jam_selesai || !closureForm.tech.trim()) {
+      alert('Tindakan perbaikan, tanggal RFU, jam RFU, dan mekanik wajib diisi.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await api.updateWOStatus(selectedClosureWO.no_wo, 'CLOSED', closureForm);
+      if (res.success) {
+        setIsClosureModalOpen(false);
+        setIsModalOpen(false);
+        setSelectedClosureWO(null);
+        setForm(prev => ({
+          ...prev,
+          status: 'CLOSED',
+          action_log: closureForm.action_log,
+          tgl_selesai: closureForm.tgl_selesai,
+          jam_selesai: closureForm.jam_selesai,
+          tech: closureForm.tech
+        }));
+        onRefresh();
+      } else {
+        alert(res.message || 'Gagal menutup Work Order');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -214,6 +274,11 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
     e.preventDefault();
     if (!form.equip_no || !form.kendala?.trim()) {
       alert('Harap pilih unit dan isi deskripsi kendala / masalah!');
+      return;
+    }
+
+    if (form.status === 'CLOSED') {
+      openClosureModal(form as WorkOrder);
       return;
     }
 
@@ -405,7 +470,7 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                       <td className="py-3.5 px-4">
                         <select
                           value={s}
-                          onChange={e => handleStatusChange(wo.no_wo, e.target.value)}
+                          onChange={e => handleStatusChange(wo, e.target.value)}
                           className={`py-1 px-2 rounded-lg text-[10px] font-bold border outline-none cursor-pointer ${
                             isClosed
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
@@ -649,7 +714,15 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                   <label className="block text-slate-600 font-bold mb-1">Status Work Order</label>
                   <select
                     value={form.status}
-                    onChange={e => setForm({ ...form, status: e.target.value })}
+                    onChange={e => {
+                      const newStatus = e.target.value;
+                      if (newStatus === 'CLOSED') {
+                        setForm(prev => ({ ...prev, status: 'CLOSED' }));
+                        openClosureModal({ ...form, status: 'CLOSED' } as WorkOrder);
+                        return;
+                      }
+                      setForm(prev => ({ ...prev, status: newStatus }));
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-700 outline-none focus:border-blue-500"
                   >
                     <option value="OPEN">OPEN</option>
@@ -658,6 +731,15 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                     <option value="BREAKDOWN">BREAKDOWN</option>
                     <option value="CLOSED">CLOSED</option>
                   </select>
+                  {form.status === 'CLOSED' && (
+                    <button
+                      type="button"
+                      onClick={() => openClosureModal(form as WorkOrder)}
+                      className="mt-1.5 w-full px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-[10px] font-black transition-colors"
+                    >
+                      Isi / Perbarui Data RFU
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -789,6 +871,128 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                   className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-600/20"
                 >
                   {submitting ? 'Menyimpan...' : (isEditMode ? 'Perbarui Work Order' : 'Simpan Work Order')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal konfirmasi penyelesaian WO dan pelepasan unit menjadi RFU */}
+      {isClosureModalOpen && selectedClosureWO && (
+        <div className="fixed inset-0 bg-slate-950/70 flex items-center justify-center p-4 z-[60] overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl shadow-2xl my-8 overflow-hidden">
+            <div className="bg-emerald-950 text-white px-6 py-5 flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-400 text-emerald-950 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black">Konfirmasi Unit RFU</h3>
+                  <p className="text-xs text-emerald-200 mt-1">
+                    Lengkapi hasil pekerjaan sebelum WO {selectedClosureWO.no_wo} ditutup.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsClosureModalOpen(false)}
+                className="p-1.5 rounded-lg text-emerald-200 hover:text-white hover:bg-white/10"
+                aria-label="Tutup formulir penyelesaian WO"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCloseWorkOrder} className="p-6 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div>
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Unit</span>
+                  <span className="font-black text-slate-900">{selectedClosureWO.equip_no || selectedClosureWO.no_unit || '-'}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Status Setelah Simpan</span>
+                  <span className="font-black text-emerald-700">CLOSED / UNIT RFU</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-black mb-1.5">Action / Tindakan Perbaikan *</label>
+                <textarea
+                  rows={4}
+                  value={closureForm.action_log}
+                  onChange={e => setClosureForm(prev => ({ ...prev, action_log: e.target.value }))}
+                  placeholder="Contoh: Ganti hose water pump, isi coolant, bleeding system, lalu test run 30 menit—normal."
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 resize-none"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-black mb-1.5">Tanggal RFU *</label>
+                  <input
+                    type="date"
+                    value={closureForm.tgl_selesai}
+                    onChange={e => setClosureForm(prev => ({ ...prev, tgl_selesai: e.target.value }))}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-black mb-1.5">Jam RFU *</label>
+                  <div className="relative">
+                    <Clock3 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                    <input
+                      type="time"
+                      value={closureForm.jam_selesai}
+                      onChange={e => setClosureForm(prev => ({ ...prev, jam_selesai: e.target.value }))}
+                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-black mb-1.5">Mekanik / PIC Penyelesaian *</label>
+                <input
+                  type="text"
+                  list="closure-mechanics"
+                  value={closureForm.tech}
+                  onChange={e => setClosureForm(prev => ({ ...prev, tech: e.target.value }))}
+                  placeholder="Pilih atau ketik nama mekanik"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                  required
+                />
+                <datalist id="closure-mechanics">
+                  {mechanics.map(mechanic => {
+                    const name = mechanic.nama_mekanik || mechanic.nama || '';
+                    return name ? <option key={mechanic.id || name} value={name} /> : null;
+                  })}
+                </datalist>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 leading-relaxed">
+                Setelah dikonfirmasi, status WO menjadi <strong>CLOSED</strong> dan status unit otomatis menjadi <strong>RFU</strong>.
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsClosureModalOpen(false)}
+                  disabled={submitting}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-md shadow-emerald-900/15 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {submitting ? 'Menyimpan Penyelesaian...' : 'Simpan & Jadikan RFU'}
                 </button>
               </div>
             </form>

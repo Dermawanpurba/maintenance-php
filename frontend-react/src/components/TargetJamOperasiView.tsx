@@ -250,7 +250,7 @@ const ModalForm: React.FC<ModalFormProps> = ({
             </div>
             <div>
               <label className={LabelCls}>Ref. Tanggal HM</label>
-              <input type="text" className={InputCls} value={form.est_hm_date || ''} onChange={e => setForm((p: any) => ({ ...p, est_hm_date: e.target.value }))} placeholder="01-Jun-24" />
+              <input type="text" className={InputCls} value={form.est_hm_date || ''} onChange={e => setForm((p: any) => ({ ...p, est_hm_date: e.target.value }))} placeholder="01-Sep-26" />
             </div>
             <div>
               <label className={LabelCls}>Status Unit</label>
@@ -483,9 +483,9 @@ export const TargetJamOperasiView: React.FC<Props> = ({
   targetJamHarian: initHarian,
   onRefresh,
 }) => {
-  // Default to June 2024 to match user spreadsheet directly
-  const [year, setYear] = useState(2024);
-  const [month, setMonth] = useState(6);
+  // Default to September 2026 to match current operational period
+  const [year, setYear] = useState(2026);
+  const [month, setMonth] = useState(9);
 
   const [rows, setRows] = useState<TargetJamOperasi[]>(initRows);
   const [harian, setHarian] = useState<TargetJamHarian[]>(initHarian);
@@ -529,14 +529,14 @@ export const TargetJamOperasiView: React.FC<Props> = ({
     loadPeriod();
   }, [loadPeriod]);
 
-  // Seed demo June 2024
+  // Seed demo September 2026
   const handleSeedDemo = async () => {
-    if (!window.confirm('Muat 14 unit data riil template spreadsheet Juni 2024? Data akan disinkronkan ke database.')) return;
+    if (!window.confirm('Muat 14 unit data riil template spreadsheet September 2026? Data akan disinkronkan ke database.')) return;
     setSeeding(true);
     try {
       const res = await api.seedDemoTargetJam(year, month);
       if (res.success) {
-        showToast(res.message || 'Data template Juni 2024 berhasil dimuat!');
+        showToast(res.message || 'Data template September 2026 berhasil dimuat!');
         await loadPeriod();
         onRefresh();
       } else {
@@ -779,10 +779,10 @@ export const TargetJamOperasiView: React.FC<Props> = ({
               onClick={handleSeedDemo}
               disabled={seeding}
               className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl hover:bg-amber-100 dark:hover:bg-amber-900/40 cursor-pointer transition-all shadow-sm"
-              title="Muat 14 data riil screenshot Juni 2024"
+              title="Muat 14 data riil screenshot September 2026"
             >
               <Sparkles className={`w-3.5 h-3.5 text-amber-600 ${seeding ? 'animate-spin' : ''}`} />
-              {seeding ? 'Memuat Template...' : 'Muat Data Template Juni 2024'}
+              {seeding ? 'Memuat Template...' : 'Muat Data Template September 2026'}
             </button>
 
             {/* Refresh */}
@@ -1044,12 +1044,12 @@ export const TargetJamOperasiView: React.FC<Props> = ({
                     <div className="flex flex-col items-center gap-3">
                       <Calendar className="w-12 h-12 text-slate-300 dark:text-slate-700" />
                       <p className="font-bold text-slate-500 dark:text-slate-400">Belum ada jadwal unit untuk periode ini</p>
-                      <p className="text-xs text-slate-400">Klik tombol di bawah untuk memuat data template riil Juni 2024</p>
+                      <p className="text-xs text-slate-400">Klik tombol di bawah untuk memuat data template riil September 2026</p>
                       <button
                         onClick={handleSeedDemo}
                         className="mt-2 flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-2xl shadow-md cursor-pointer transition-all"
                       >
-                        <Sparkles className="w-4 h-4" /> Muat 14 Unit Template Screenshot Juni 2024
+                        <Sparkles className="w-4 h-4" /> Muat 14 Unit Template Screenshot September 2026
                       </button>
                     </div>
                   </td>

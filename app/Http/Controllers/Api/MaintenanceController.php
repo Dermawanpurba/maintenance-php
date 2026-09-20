@@ -859,18 +859,39 @@ class MaintenanceController extends Controller
 
     public function updateWOStatus($data)
     {
-        $no_wo = $data['no_wo'] ?? '';
-        $status = $data['status'] ?? 'Closed';
+        $no_wo = trim($data['no_wo'] ?? '');
+        $status = strtoupper(trim($data['status'] ?? 'CLOSED'));
+        $wo = WorkOrder::where('no_wo', $no_wo)->first();
+
+        if (!$wo) {
+            return ['success' => false, 'message' => "Work Order {$no_wo} tidak ditemukan"];
+        }
+
+        if ($status === 'CLOSED') {
+            $required = [
+                'action_log' => 'Action / tindakan perbaikan',
+                'tgl_selesai' => 'Tanggal RFU',
+                'jam_selesai' => 'Jam RFU',
+                'tech' => 'Mekanik / PIC'
+            ];
+
+            foreach ($required as $field => $label) {
+                if (empty(trim((string) ($data[$field] ?? '')))) {
+                    return ['success' => false, 'message' => "{$label} wajib diisi sebelum WO ditutup"];
+                }
+            }
+        }
+
         $update = ['status' => $status];
         if (isset($data['tgl_selesai'])) $update['tgl_selesai'] = $data['tgl_selesai'];
         if (isset($data['jam_selesai'])) $update['jam_selesai'] = $data['jam_selesai'];
-        if (isset($data['action_log'])) $update['action_log'] = $data['action_log'];
+        if (isset($data['action_log'])) $update['action_log'] = trim((string) $data['action_log']);
+        if (isset($data['tech'])) $update['tech'] = trim((string) $data['tech']);
 
-        WorkOrder::where('no_wo', $no_wo)->update($update);
+        $wo->update($update);
 
-        $wo = WorkOrder::where('no_wo', $no_wo)->first();
-        if ($wo && !empty($wo->equip_no)) {
-            $unitStatus = (strtoupper($status) === 'CLOSED') ? 'RFU' : (strtoupper($status) === 'BREAKDOWN' ? 'B/D' : 'RWN');
+        if (!empty($wo->equip_no)) {
+            $unitStatus = $status === 'CLOSED' ? 'RFU' : ($status === 'BREAKDOWN' ? 'B/D' : 'RWN');
             MasterEquip::where('equip_no', $wo->equip_no)->update(['status' => $unitStatus]);
         }
 
@@ -1977,135 +1998,135 @@ class MaintenanceController extends Controller
 
     public function seedDemoTargetJam($data)
     {
-        $year = intval($data['plan_year'] ?? 2024);
-        $month = intval($data['plan_month'] ?? 6);
+        $year = intval($data['plan_year'] ?? 2026);
+        $month = intval($data['plan_month'] ?? 9);
 
         $units = [
             [
-                'section' => 'MINING', 'equip_no' => 'DZ 201', 'model' => 'D85ESS-2', 'est_hm' => 18787, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
-                'next_service_hours_due' => 19000, 'next_service_hours_due_2' => 19250,
+                'section' => 'MINING', 'equip_no' => 'DZ 201', 'model' => 'D85ESS-2', 'est_hm' => 46700, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
+                'next_service_hours_due' => 47000, 'next_service_hours_due_2' => 47250,
                 'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2024-06-18', 'next_service_date_2' => '2024-07-09',
+                'next_service_date' => '2026-09-18', 'next_service_date_2' => '2026-10-09',
                 'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 6, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [17 => 24, 18 => 24]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'DZ 222', 'model' => 'D85ESS-2', 'est_hm' => 21096, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
-                'next_service_hours_due' => 21250, 'next_service_hours_due_2' => 21500,
+                'section' => 'MINING', 'equip_no' => 'DZ 222', 'model' => 'D85ESS-2', 'est_hm' => 49000, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
+                'next_service_hours_due' => 49250, 'next_service_hours_due_2' => 49500,
                 'next_service_type' => '250', 'next_service_type_2' => '500',
-                'next_service_date' => '2024-06-13', 'next_service_date_2' => '2024-07-04',
+                'next_service_date' => '2026-09-13', 'next_service_date_2' => '2026-10-04',
                 'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 5, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [13 => 5]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'DZ 273', 'model' => 'D85ESS-2', 'est_hm' => 15900, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
-                'next_service_hours_due' => 16000, 'next_service_hours_due_2' => 16250,
+                'section' => 'MINING', 'equip_no' => 'DZ 273', 'model' => 'D85ESS-2', 'est_hm' => 43900, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
+                'next_service_hours_due' => 44000, 'next_service_hours_due_2' => 44250,
                 'next_service_type' => '4000', 'next_service_type_2' => '250',
-                'next_service_date' => '2024-06-09', 'next_service_date_2' => '2024-06-30',
+                'next_service_date' => '2026-09-09', 'next_service_date_2' => '2026-09-30',
                 'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 1,
                 'downtime_pm' => 17, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [10 => 12, 29 => 24, 30 => 24]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'DZ 281', 'model' => 'D85ESS-2', 'est_hm' => 17707, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
-                'next_service_hours_due' => 17750, 'next_service_hours_due_2' => 18000,
+                'section' => 'MINING', 'equip_no' => 'DZ 281', 'model' => 'D85ESS-2', 'est_hm' => 45700, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
+                'next_service_hours_due' => 45750, 'next_service_hours_due_2' => 46000,
                 'next_service_type' => '250', 'next_service_type_2' => '2000',
-                'next_service_date' => '2024-06-04', 'next_service_date_2' => '2024-06-25',
+                'next_service_date' => '2026-09-04', 'next_service_date_2' => '2026-09-25',
                 'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 1, 'pm_4000' => 0,
                 'downtime_pm' => 13, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [5 => 5, 26 => 24, 27 => 24, 28 => 24]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'DZ 294', 'model' => 'D85ESS-2', 'est_hm' => 18239, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
-                'next_service_hours_due' => 18250, 'next_service_hours_due_2' => 18500,
+                'section' => 'MINING', 'equip_no' => 'DZ 294', 'model' => 'D85ESS-2', 'est_hm' => 46200, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
+                'next_service_hours_due' => 46250, 'next_service_hours_due_2' => 46500,
                 'next_service_type' => '250', 'next_service_type_2' => '500',
-                'next_service_date' => '2024-06-01', 'next_service_date_2' => '2024-06-22',
+                'next_service_date' => '2026-09-01', 'next_service_date_2' => '2026-09-22',
                 'pm_250' => 1, 'pm_500' => 1, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 5, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [2 => 24, 3 => 24, 4 => 24, 5 => 24, 6 => 24, 7 => 24, 8 => 24, 9 => 24, 10 => 24, 11 => 24, 12 => 24, 13 => 24, 14 => 24, 15 => 24, 16 => 24, 17 => 24, 18 => 24, 22 => 5]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'DZ 331', 'model' => 'D85ESS-2', 'est_hm' => 12836, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
-                'next_service_hours_due' => 13000, 'next_service_hours_due_2' => 13250,
+                'section' => 'MINING', 'equip_no' => 'DZ 331', 'model' => 'D85ESS-2', 'est_hm' => 40800, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
+                'next_service_hours_due' => 41000, 'next_service_hours_due_2' => 41250,
                 'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2024-06-14', 'next_service_date_2' => '2024-07-05',
+                'next_service_date' => '2026-09-14', 'next_service_date_2' => '2026-10-05',
                 'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 6, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [15 => 24, 16 => 24]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'DZ 365', 'model' => 'D85ESS-2', 'est_hm' => 18904, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
-                'next_service_hours_due' => 19000, 'next_service_hours_due_2' => 19250,
+                'section' => 'MINING', 'equip_no' => 'DZ 365', 'model' => 'D85ESS-2', 'est_hm' => 46900, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
+                'next_service_hours_due' => 47000, 'next_service_hours_due_2' => 47250,
                 'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2024-06-08', 'next_service_date_2' => '2024-06-29',
+                'next_service_date' => '2026-09-08', 'next_service_date_2' => '2026-09-29',
                 'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 11, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [7 => 6, 30 => 5]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'DZ 373', 'model' => 'D65P-12', 'est_hm' => 4702, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'section' => 'MINING', 'equip_no' => 'DZ 373', 'model' => 'D65P-12', 'est_hm' => 4702, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
                 'next_service_hours_due' => 4750, 'next_service_hours_due_2' => 5000,
                 'next_service_type' => '250', 'next_service_type_2' => '1000',
-                'next_service_date' => '2024-06-05', 'next_service_date_2' => '2024-06-25',
+                'next_service_date' => '2026-09-05', 'next_service_date_2' => '2026-09-25',
                 'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 9, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [5 => 24, 6 => 24, 25 => 6]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'DZ 393', 'model' => 'D65P-12', 'est_hm' => 1752, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'section' => 'MINING', 'equip_no' => 'DZ 393', 'model' => 'D65P-12', 'est_hm' => 1752, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
                 'next_service_hours_due' => 2000, 'next_service_hours_due_2' => 2250,
                 'next_service_type' => '2000', 'next_service_type_2' => '250',
-                'next_service_date' => '2024-06-21', 'next_service_date_2' => '2024-07-12',
+                'next_service_date' => '2026-09-21', 'next_service_date_2' => '2026-10-12',
                 'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 1, 'pm_4000' => 0,
                 'downtime_pm' => 8, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [19 => 24, 20 => 24, 21 => 24]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'DZ 422', 'model' => 'D65P-12', 'est_hm' => 774, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'section' => 'MINING', 'equip_no' => 'DZ 422', 'model' => 'D65P-12', 'est_hm' => 774, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
                 'next_service_hours_due' => 1000, 'next_service_hours_due_2' => 1250,
                 'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2024-06-19', 'next_service_date_2' => '2024-07-10',
+                'next_service_date' => '2026-09-19', 'next_service_date_2' => '2026-10-10',
                 'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 6, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [18 => 6]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'MG 081', 'model' => 'GD535', 'est_hm' => 12984, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'section' => 'MINING', 'equip_no' => 'MG 081', 'model' => 'GD535', 'est_hm' => 12984, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
                 'next_service_hours_due' => 13000, 'next_service_hours_due_2' => 13250,
                 'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2024-06-02', 'next_service_date_2' => '2024-06-23',
+                'next_service_date' => '2026-09-02', 'next_service_date_2' => '2026-09-23',
                 'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 9, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [2 => 24, 3 => 24, 22 => 3]
             ],
             [
-                'section' => 'HAULING', 'equip_no' => 'MG 123', 'model' => 'GD535', 'est_hm' => 17493, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'section' => 'HAULING', 'equip_no' => 'MG 123', 'model' => 'GD535', 'est_hm' => 17493, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
                 'next_service_hours_due' => 17500, 'next_service_hours_due_2' => 17750,
                 'next_service_type' => '500', 'next_service_type_2' => '250',
-                'next_service_date' => '2024-06-01', 'next_service_date_2' => '2024-06-22',
+                'next_service_date' => '2026-09-01', 'next_service_date_2' => '2026-09-22',
                 'pm_250' => 0, 'pm_500' => 1, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 3, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [21 => 24, 22 => 24]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'MG 212', 'model' => 'GD535', 'est_hm' => 995, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'section' => 'MINING', 'equip_no' => 'MG 212', 'model' => 'GD535', 'est_hm' => 995, 'est_hm_date' => '01-Sep-26', 'status' => 'RFU',
                 'next_service_hours_due' => 1000, 'next_service_hours_due_2' => 1250,
                 'next_service_type' => '1000', 'next_service_type_2' => '250',
-                'next_service_date' => '2024-06-01', 'next_service_date_2' => '2024-06-22',
+                'next_service_date' => '2026-09-01', 'next_service_date_2' => '2026-09-22',
                 'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 3, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
                 'daily' => [22 => 3]
             ],
             [
-                'section' => 'MINING', 'equip_no' => 'VB 124', 'model' => 'BW211D-40', 'est_hm' => 8388, 'est_hm_date' => '01-Jun-24', 'status' => 'BD',
+                'section' => 'MINING', 'equip_no' => 'VB 124', 'model' => 'BW211D-40', 'est_hm' => 8388, 'est_hm_date' => '01-Sep-26', 'status' => 'BD',
                 'next_service_hours_due' => 8500, 'next_service_hours_due_2' => 8750,
                 'next_service_type' => '500', 'next_service_type_2' => '250',
                 'next_service_date' => null, 'next_service_date_2' => null,
                 'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
                 'downtime_pm' => 0, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
-                'daily' => array_fill_keys(range(1, 30), 24)
+                'daily' => array_fill_keys(range(1, 20), 24)
             ]
         ];
 

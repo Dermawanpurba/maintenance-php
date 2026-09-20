@@ -840,29 +840,49 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
     }
   }, [normalizedCategory]);
 
-  // Active weeks from database (defaults to standard 4 weeks if DB empty yet)
+  // Active weeks from database (defaults to 1–20 September 2026 if DB is empty)
   const activeWeeksList: MaintenanceWeek[] = useMemo(() => {
     if (maintenanceWeeks && maintenanceWeeks.length > 0) {
       return [...maintenanceWeeks].sort((a, b) => a.id - b.id);
     }
     return [
-      { id: 1, week_no: 'WEEK 40', label: 'Week 40 (01 Okt - 07 Okt 2026)', is_active: false, target_compliance: 100 },
-      { id: 2, week_no: 'WEEK 41', label: 'Week 41 (08 Okt - 14 Okt 2026)', is_active: false, target_compliance: 100 },
-      { id: 3, week_no: 'WEEK 42', label: 'Week 42 (15 Okt - 21 Okt 2026)', is_active: false, target_compliance: 100 },
-      { id: 4, week_no: 'WEEK 43', label: 'Week 43 (22 Okt - 28 Okt 2026)', is_active: true, target_compliance: 100 }
+      { id: 1, week_no: 'WEEK 36', label: 'Week 36 (01 Sep - 06 Sep 2026)', is_active: false, target_compliance: 100 },
+      { id: 2, week_no: 'WEEK 37', label: 'Week 37 (07 Sep - 13 Sep 2026)', is_active: false, target_compliance: 100 },
+      { id: 3, week_no: 'WEEK 38', label: 'Week 38 (14 Sep - 20 Sep 2026)', is_active: true, target_compliance: 100 }
     ];
   }, [maintenanceWeeks]);
 
   // Determine current active week from database
   const defaultActiveWeek = useMemo(() => {
     const active = activeWeeksList.find(w => w.is_active);
-    return active ? active.week_no : (activeWeeksList[activeWeeksList.length - 1]?.week_no || 'WEEK 43');
+    return active ? active.week_no : (activeWeeksList[activeWeeksList.length - 1]?.week_no || 'WEEK 38');
   }, [activeWeeksList]);
 
   // Selected unit & form state
   const initialEq = equipments[0];
   const [equipNo, setEquipNo] = useState(initialEq?.equip_no || initialEq?.no_unit || 'EX1210');
   const [overviewCategoryFilter, setOverviewCategoryFilter] = useState<'ALL' | EquipmentCategory>('ALL');
+  const [overviewWeekFilter, setOverviewWeekFilter] = useState<string>(defaultActiveWeek);
+
+  // Keep the dashboard filter valid after weeks are loaded, added, or removed.
+  useEffect(() => {
+    const filterStillExists = overviewWeekFilter === 'ALL'
+      || activeWeeksList.some(w => w.week_no === overviewWeekFilter);
+
+    if (!filterStillExists) {
+      setOverviewWeekFilter(defaultActiveWeek);
+    }
+  }, [activeWeeksList, defaultActiveWeek, overviewWeekFilter]);
+
+  const overviewWeeks = useMemo(() => {
+    if (overviewWeekFilter === 'ALL') return activeWeeksList;
+    return activeWeeksList.filter(w => w.week_no === overviewWeekFilter);
+  }, [activeWeeksList, overviewWeekFilter]);
+
+  const selectedOverviewWeek = useMemo(
+    () => activeWeeksList.find(w => w.week_no === overviewWeekFilter),
+    [activeWeeksList, overviewWeekFilter]
+  );
 
   // Dynamically resolve selected equipment details and machine family category
   const selectedEquipment = useMemo(() => {
@@ -956,12 +976,15 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
       const overallAvg = weeksWithDataCount > 0
         ? Math.round(totalValidPercentages / weeksWithDataCount)
         : 0;
+      const displayedAvg = overviewWeekFilter === 'ALL'
+        ? overallAvg
+        : (weekValues[overviewWeekFilter]?.val || 0);
 
-      // Extract specific 4 weeks for layout compatibility
-      const w40 = weekValues['WEEK 40']?.val || 0;
-      const w41 = weekValues['WEEK 41']?.val || 0;
-      const w42 = weekValues['WEEK 42']?.val || 0;
-      const w43 = weekValues['WEEK 43']?.val || 0;
+      // Legacy aliases retained for consumers of the matrix shape.
+      const w40 = weekValues['WEEK 36']?.val || 0;
+      const w41 = weekValues['WEEK 37']?.val || 0;
+      const w42 = weekValues['WEEK 38']?.val || 0;
+      const w43 = weekValues['WEEK 38']?.val || 0;
 
       return {
         id: mod.id,
@@ -971,11 +994,11 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
         w41,
         w42,
         w43,
-        avg: overallAvg,
+        avg: displayedAvg,
         totalRecords: modRecords.length
       };
     });
-  }, [pmRecords, activeWeeksList, overviewCategoryFilter, equipments]);
+  }, [pmRecords, activeWeeksList, overviewCategoryFilter, overviewWeekFilter, equipments]);
 
   // Overall compliance across all 8 sub-modules from actual database
   const overallPlantCompliance = useMemo(() => {
@@ -1005,7 +1028,7 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
         eq_model: eq?.model || 'Equipment',
         category_family: cat,
         tanggal: r.tanggal || '2026-09-19',
-        week_no: r.week_no || 'WEEK 43',
+        week_no: r.week_no || 'WEEK 38',
         hm: Number(r.hm_pm || 0),
         category: adapted ? adapted.name : (matchedConfig ? matchedConfig.name : (r.pm_type || 'Basic Maintenance')),
         subModuleId: matchedConfig ? matchedConfig.id : 'bm_inspection',
@@ -1162,12 +1185,14 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
 
   // Render individual SVG Bar Chart dynamically from database values
   const renderWeeklyBarChart = (item: typeof performanceMatrix[0], maxScale = 150) => {
-    // Dynamic bars matching active weeks in database
-    const bars = activeWeeksList.map(w => ({
+    // Show only the selected week in focused mode; retain the full trend in ALL mode.
+    const bars = overviewWeeks.map(w => ({
       label: w.week_no,
       val: item.weekValues[w.week_no]?.val || 0
     }));
-    bars.push({ label: 'Average', val: item.avg });
+    if (overviewWeekFilter === 'ALL') {
+      bars.push({ label: 'Average', val: item.avg });
+    }
 
     return (
       <div
@@ -1388,39 +1413,70 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
       {/* ================= VIEW 1: EXECUTIVE DASHBOARD & WEEKLY TRENDS ================= */}
       {activeTab === 'dashboard' && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Equipment Category Filter Bar for Mixed Fleet Analysis */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <Truck className="w-4 h-4 text-blue-600" />
-                Filter Model Armada:
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium">
-                {overviewCategoryFilter === 'ALL' ? 'Menampilkan seluruh armada site' : `Menampilkan kepatuhan armada ${getCategoryLabel(overviewCategoryFilter)}`}
-              </span>
+          {/* Dashboard filters: fleet category and database-backed week context */}
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-blue-600" aria-hidden="true" />
+                <div>
+                  <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                    Filter Model Armada
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {overviewCategoryFilter === 'ALL' ? 'Menampilkan seluruh armada site' : `Menampilkan kepatuhan armada ${getCategoryLabel(overviewCategoryFilter)}`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: 'ALL', label: 'Semua Kategori' },
+                  { id: 'EXCAVATOR', label: 'Excavator (Bucket)' },
+                  { id: 'DUMP_TRUCK', label: 'Dump Truck (Wheel)' },
+                  { id: 'BULLDOZER', label: 'Bulldozer (Blade)' },
+                  { id: 'WHEEL_LOADER', label: 'Wheel Loader' },
+                  { id: 'GENSET', label: 'Genset / Plant' }
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => setOverviewCategoryFilter(f.id as any)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      overviewCategoryFilter === f.id
+                        ? 'bg-blue-600 text-white shadow-xs scale-[1.02]'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5">
-              {[
-                { id: 'ALL', label: 'Semua Kategori' },
-                { id: 'EXCAVATOR', label: 'Excavator (Bucket)' },
-                { id: 'DUMP_TRUCK', label: 'Dump Truck (Wheel)' },
-                { id: 'BULLDOZER', label: 'Bulldozer (Blade)' },
-                { id: 'WHEEL_LOADER', label: 'Wheel Loader' },
-                { id: 'GENSET', label: 'Genset / Plant' }
-              ].map(f => (
-                <button
-                  key={f.id}
-                  onClick={() => setOverviewCategoryFilter(f.id as any)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                    overviewCategoryFilter === f.id
-                      ? 'bg-blue-600 text-white shadow-xs scale-[1.02]'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
+            <div className="border-t border-slate-100 pt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-[auto_minmax(260px,420px)_1fr] sm:items-center gap-2">
+                <label htmlFor="overview-week-filter" className="flex items-center gap-1.5 text-xs font-black text-slate-800 uppercase tracking-wider whitespace-nowrap">
+                  <Calendar className="w-4 h-4 text-blue-600" aria-hidden="true" />
+                  Pilih Periode Overview
+                </label>
+                <select
+                  id="overview-week-filter"
+                  value={overviewWeekFilter}
+                  onChange={e => setOverviewWeekFilter(e.target.value)}
+                  className="w-full text-xs font-black bg-blue-50 border border-blue-300 rounded-lg px-3 py-2 text-blue-900 focus:ring-2 focus:ring-blue-500"
                 >
-                  {f.label}
-                </button>
-              ))}
+                  <option value="ALL">Semua periode — tampilkan tren lengkap</option>
+                  {activeWeeksList.map(w => (
+                    <option key={w.week_no} value={w.week_no}>
+                      {w.week_no}{w.is_active ? ' • AKTIF' : ' • PERIODE SEBELUMNYA'}{w.label ? ` — ${w.label}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  {overviewWeekFilter === 'ALL'
+                    ? 'Menampilkan seluruh periode minggu yang tersimpan di database.'
+                    : `Membuka data ${selectedOverviewWeek?.label || overviewWeekFilter}.`}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1445,7 +1501,9 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
                   </span>
                   <h3 className="text-lg font-black mt-0.5">Basic Maintenance Compliance</h3>
                   <p className="text-xs text-slate-300 mt-1">
-                    Kepatuhan actual seluruh armada site plant ({activeWeeksList[0]?.week_no || 'W40'} - {activeWeeksList[activeWeeksList.length - 1]?.week_no || 'W43'})
+                    {overviewWeekFilter === 'ALL'
+                      ? `Kepatuhan actual seluruh armada site plant (${activeWeeksList[0]?.week_no || 'W40'} - ${activeWeeksList[activeWeeksList.length - 1]?.week_no || 'W43'})`
+                      : `Kepatuhan actual seluruh armada site plant pada ${selectedOverviewWeek?.label || overviewWeekFilter}`}
                   </p>
                   <div className="mt-3 flex items-center gap-3">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-black border border-emerald-500/30">
@@ -1484,7 +1542,7 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
                     <thead>
                       <tr className="bg-[#b4c6e7] text-slate-900 font-extrabold text-[11px] border-b border-slate-300">
                         <th className="py-2 px-3 text-left border-r border-slate-300">DESC</th>
-                        {activeWeeksList.map(w => (
+                        {overviewWeeks.map(w => (
                           <th key={w.week_no} className="py-2 px-2 text-center border-r border-slate-300 min-w-[65px]">
                             {w.week_no}
                           </th>
@@ -1508,7 +1566,7 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
                             <ChevronRight className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </td>
 
-                          {activeWeeksList.map(w => {
+                          {overviewWeeks.map(w => {
                             const val = row.weekValues[w.week_no]?.val || 0;
                             return (
                               <td key={w.week_no} className="py-2 px-2 text-center border-r border-slate-200 font-mono">
@@ -2055,25 +2113,38 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
             <div className="p-5 space-y-5">
               {/* Existing Weeks List in Database */}
               <div>
-                <h4 className="text-xs font-bold text-slate-700 uppercase mb-2">
-                  Daftar Periode Minggu Aktif di Database ({activeWeeksList.length})
+                <h4 className="text-xs font-bold text-slate-700 uppercase mb-1">
+                  Semua Periode Minggu di Database ({activeWeeksList.length})
                 </h4>
-                <div className="max-h-40 overflow-y-auto space-y-1.5 border border-slate-200 rounded-xl p-2 bg-slate-50">
+                <p className="text-[10px] text-slate-500 mb-2">Pilih periode lama untuk langsung membukanya pada halaman Overview.</p>
+                <div className="max-h-44 overflow-y-auto space-y-1.5 border border-slate-200 rounded-xl p-2 bg-slate-50">
                   {activeWeeksList.map(w => (
-                    <div
+                    <button
+                      type="button"
                       key={w.week_no}
-                      className="p-2 rounded-lg bg-white border border-slate-200 flex items-center justify-between text-xs"
+                      onClick={() => {
+                        setOverviewWeekFilter(w.week_no);
+                        setActiveTab('dashboard');
+                        setIsWeekModalOpen(false);
+                        if (onNavigate) onNavigate('bm_dashboard');
+                      }}
+                      className={`w-full p-2 rounded-lg border flex items-center justify-between gap-3 text-xs text-left transition-colors ${
+                        overviewWeekFilter === w.week_no
+                          ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-200'
+                          : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/40'
+                      }`}
                     >
-                      <div>
+                      <div className="min-w-0">
                         <span className="font-black text-slate-900">{w.week_no}</span>
                         {w.is_active && (
                           <span className="ml-2 bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded">
                             AKTIF
                           </span>
                         )}
-                        <p className="text-[10px] text-slate-500">{w.label || w.notes || 'Tanpa label'}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{w.label || w.notes || 'Tanpa label'}</p>
                       </div>
-                    </div>
+                      <span className="shrink-0 text-[9px] font-black uppercase text-blue-700">Buka Overview →</span>
+                    </button>
                   ))}
                 </div>
               </div>
