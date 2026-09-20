@@ -54,8 +54,38 @@ Route::prefix('maintenance')->group(function () {
     Route::get('/master-parts', fn () => response()->json(['success' => true, 'data' => \App\Models\MasterPart::all()]));
     Route::get('/stocks', fn () => response()->json(['success' => true, 'data' => \App\Models\Stock::all()]));
 
+    // Scheduled Oil Sampling (SOS)
+    Route::get('/oil-samples', fn () => response()->json(['success' => true, 'data' => \App\Models\OilSample::all()]));
+    Route::post('/oil-samples', [MaintenanceController::class, 'saveOilSample']);
+    Route::delete('/oil-samples/{id}', [MaintenanceController::class, 'deleteOilSample']);
+
+    // Basic Maintenance / PM Records
+    Route::get('/pm-records', fn () => response()->json(['success' => true, 'data' => \App\Models\PmRecord::orderByDesc('id')->get()]));
+    Route::post('/pm-records', [MaintenanceController::class, 'savePMRecord']);
+    Route::delete('/pm-records/{id}', [MaintenanceController::class, 'deletePMRecord']);
+
+    // Maintenance Weeks (Period Database)
+    Route::get('/maintenance-weeks', fn () => response()->json(['success' => true, 'data' => \App\Models\MaintenanceWeek::orderBy('id')->get()]));
+    Route::post('/maintenance-weeks', [MaintenanceController::class, 'saveMaintenanceWeek']);
+    Route::delete('/maintenance-weeks/{id}', [MaintenanceController::class, 'deleteMaintenanceWeek']);
+
     // 1-Click .ZIP System Backup
     Route::get('/backup/download', [\App\Http\Controllers\Api\BackupController::class, 'downloadZip']);
+
+    // Target Jam Operasi (Plan Alat)
+    Route::get('/target-jam-operasi', fn () => response()->json([
+        'success' => true,
+        'data'    => \App\Models\TargetJamOperasi::orderBy('section')->orderBy('equip_no')->get()
+    ]));
+    Route::post('/target-jam-operasi', [\App\Http\Controllers\Api\MaintenanceController::class, 'savePlanAlatRow']);
+    Route::delete('/target-jam-operasi/{id}', [\App\Http\Controllers\Api\MaintenanceController::class, 'deletePlanAlatRow']);
+
+    Route::get('/target-jam-harian', fn () => response()->json([
+        'success' => true,
+        'data'    => \App\Models\TargetJamHarian::all()
+    ]));
+    Route::post('/target-jam-harian', [\App\Http\Controllers\Api\MaintenanceController::class, 'saveJamHarian']);
+    Route::post('/target-jam-operasi/seed-demo', fn (\Illuminate\Http\Request $req) => response()->json(app(\App\Http\Controllers\Api\MaintenanceController::class)->seedDemoTargetJam($req->all())));
 });
 
 // 1-Click .ZIP System Backup Global Route

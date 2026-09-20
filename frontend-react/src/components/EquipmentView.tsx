@@ -7,15 +7,17 @@ interface EquipmentViewProps {
   equipments: Equipment[];
   planAlats?: PlanAlat[];
   planServices?: PlanService[];
+  onNavigate?: (tab: string) => void;
   onRefresh: () => void;
 }
 
-type EquipTab = 'armada' | 'plan_alat' | 'plan_service';
+type EquipTab = 'armada' | 'plan_service';
 
 export const EquipmentView: React.FC<EquipmentViewProps> = ({
   equipments,
   planAlats = [],
   planServices = [],
+  onNavigate,
   onRefresh,
 }) => {
   const [activeTab, setActiveTab] = useState<EquipTab>('armada');
@@ -37,17 +39,6 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     status: 'READY',
     last_hm: 0,
     serial_number: '',
-  });
-
-  // Modal State for Plan Alat
-  const [isPlanAlatModalOpen, setIsPlanAlatModalOpen] = useState(false);
-  const [planAlatForm, setPlanAlatForm] = useState<Partial<PlanAlat>>({
-    equip_no: equipments[0]?.no_unit || '',
-    model: equipments[0]?.model || '',
-    plan_hours_per_month: 450,
-    plan_pa: 90,
-    mohh: 500,
-    status: 'ACTIVE',
   });
 
   // Modal State for Plan Service
@@ -125,38 +116,6 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     }
   };
 
-  const handleSavePlanAlat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!planAlatForm.equip_no) return;
-    try {
-      setSubmitting(true);
-      const res = await api.saveMaster({
-        type: 'PlanAlat',
-        payload: planAlatForm,
-      });
-      if (res.success) {
-        setIsPlanAlatModalOpen(false);
-        onRefresh();
-      } else {
-        alert(res.message || 'Gagal menyimpan Plan Alat');
-      }
-    } catch (err: any) {
-      alert('Error: ' + err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeletePlanAlat = async (equip_no: string) => {
-    if (!window.confirm(`Hapus target Plan Alat untuk unit ${equip_no}?`)) return;
-    try {
-      const res = await api.deletePlan({ equip_no, type: 'PlanAlat' });
-      if (res.success) onRefresh();
-      else alert(res.message || 'Gagal menghapus target');
-    } catch (err: any) {
-      alert('Error: ' + err.message);
-    }
-  };
 
   const handleSavePlanService = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,18 +168,6 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
             <span>Master Armada ({equipments.length})</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('plan_alat')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              activeTab === 'plan_alat'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <Gauge className="w-4 h-4" />
-            <span>Target Jam Operasi (Plan Alat)</span>
-          </button>
 
           <button
             type="button"
@@ -392,88 +339,6 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
             </div>
           </div>
         </>
-      )}
-
-      {/* TAB 2: PLAN TARGET JAM OPERASI (PLAN ALAT) */}
-      {activeTab === 'plan_alat' && (
-        <div className="space-y-4">
-          <div className="bg-white border border-slate-200/80 p-4 md:p-5 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-base font-black text-slate-900 tracking-tight">
-                Target Jam Operasi &amp; Ketersediaan Unit (Plan Alat)
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Target jam kerja bulanan, target Physical Availability (PA), dan Maximum Operating Hours (MOHH)
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsPlanAlatModalOpen(true)}
-              className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-sm shadow-blue-500/30 transition-all cursor-pointer whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Set Target Plan Alat</span>
-            </button>
-          </div>
-
-          <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-slate-100/80 text-slate-500 font-black uppercase text-[10px] tracking-wider border-b border-slate-200/80">
-                    <th className="py-3 px-4">No. Unit</th>
-                    <th className="py-3 px-4">Model Alat</th>
-                    <th className="py-3 px-4">Target Jam / Bulan</th>
-                    <th className="py-3 px-4">Target PA (%)</th>
-                    <th className="py-3 px-4">MOHH (Jam)</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-center">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {planAlats.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-10 text-slate-400">
-                        Belum ada target Plan Alat tersimpan. Silakan klik "Set Target Plan Alat".
-                      </td>
-                    </tr>
-                  ) : (
-                    planAlats.map((pa, idx) => (
-                      <tr key={pa.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-slate-900">{pa.equip_no}</td>
-                        <td className="py-3 px-4 font-semibold text-slate-700">{pa.model || '-'}</td>
-                        <td className="py-3 px-4 font-mono font-bold text-blue-600">
-                          {Number(pa.plan_hours_per_month || 0).toLocaleString()} Jam
-                        </td>
-                        <td className="py-3 px-4 font-mono font-bold text-emerald-600">
-                          {Number(pa.plan_pa || 0)}%
-                        </td>
-                        <td className="py-3 px-4 font-mono text-slate-600">
-                          {Number(pa.mohh || 0).toLocaleString()} Jam
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold">
-                            {pa.status || 'ACTIVE'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleDeletePlanAlat(pa.equip_no)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Hapus Target"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* TAB 3: ESTIMASI SERVICE BERKALA (PLAN SERVICE) */}
@@ -682,112 +547,6 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                   className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-md shadow-blue-500/20 active:scale-95 disabled:opacity-50"
                 >
                   {submitting ? 'Menyimpan...' : isEditing ? 'Simpan Perubahan' : 'Simpan Unit'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Dialog Plan Alat */}
-      {isPlanAlatModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 w-full max-w-lg shadow-2xl relative">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                  <Gauge className="w-4 h-4" />
-                </div>
-                <h3 className="text-base font-black text-slate-900 tracking-tight">
-                  Target Operasi Unit (Plan Alat)
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPlanAlatModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSavePlanAlat} className="space-y-4 mt-4 text-xs font-semibold">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-600 mb-1">Pilih Unit Armada</label>
-                  <select
-                    value={planAlatForm.equip_no}
-                    onChange={e => {
-                      const eq = equipments.find(x => x.no_unit === e.target.value);
-                      setPlanAlatForm({ ...planAlatForm, equip_no: e.target.value, model: eq?.model || '' });
-                    }}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-bold outline-none focus:border-blue-500"
-                  >
-                    {equipments.map(eq => (
-                      <option key={eq.id} value={eq.no_unit}>
-                        {eq.no_unit} - {eq.model}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-600 mb-1">Model Alat</label>
-                  <input
-                    type="text"
-                    value={planAlatForm.model || ''}
-                    onChange={e => setPlanAlatForm({ ...planAlatForm, model: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-medium outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-slate-600 mb-1">Target Jam / Bln</label>
-                  <input
-                    type="number"
-                    value={planAlatForm.plan_hours_per_month}
-                    onChange={e => setPlanAlatForm({ ...planAlatForm, plan_hours_per_month: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-mono font-bold outline-none focus:border-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-600 mb-1">Target PA (%)</label>
-                  <input
-                    type="number"
-                    value={planAlatForm.plan_pa}
-                    onChange={e => setPlanAlatForm({ ...planAlatForm, plan_pa: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-mono font-bold outline-none focus:border-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-600 mb-1">MOHH (Jam)</label>
-                  <input
-                    type="number"
-                    value={planAlatForm.mohh}
-                    onChange={e => setPlanAlatForm({ ...planAlatForm, mohh: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-mono font-bold outline-none focus:border-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsPlanAlatModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-md shadow-blue-500/20 active:scale-95 disabled:opacity-50"
-                >
-                  {submitting ? 'Menyimpan...' : 'Simpan Target Plan Alat'}
                 </button>
               </div>
             </form>

@@ -128,7 +128,7 @@ export const SwabView: React.FC<SwabViewProps> = ({ swabs, equipments, onRefresh
                       </td>
                       <td className="py-3.5 px-4">
                         <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
-                          {s.recipient_unit}
+                          {s.recipient_unit || (s as any).target_unit || '-'}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-slate-600 max-w-xs truncate" title={s.reason}>
@@ -157,7 +157,7 @@ export const SwabView: React.FC<SwabViewProps> = ({ swabs, equipments, onRefresh
                           {isActive ? 'Aktif Terpasang' : 'Sudah Dikembalikan'}
                         </button>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-600 font-semibold">{s.pic || '-'}</td>
+                      <td className="py-3.5 px-4 text-slate-600 font-semibold">{s.pic || (s as any).authorized_by || (s as any).mechanic || '-'}</td>
                       <td className="py-3.5 px-4 text-center">
                         <button
                           type="button"

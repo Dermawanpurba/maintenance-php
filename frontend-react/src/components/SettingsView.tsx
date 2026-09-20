@@ -100,13 +100,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialSettings, onR
             </p>
           </div>
 
-          <button
-            onClick={handleBackup}
-            className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/30"
-          >
-            <Download className="w-4 h-4" />
-            Download Backup .ZIP 1-Klik
-          </button>
+
         </div>
       </div>
 
@@ -267,22 +261,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialSettings, onR
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-3">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-              <HardDrive className="w-4 h-4 text-emerald-600" />
-              Paket Cadangan Menyeluruh
-            </h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Pencadangan mengemas file fisik database SQLite, berkas storage publik, dan dump JSON terstruktur dalam 1 file .ZIP aman.
-            </p>
-            <button
-              onClick={handleBackup}
-              className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
-            >
-              <Download className="w-4 h-4" />
-              Unduh Backup Sekarang
-            </button>
-          </div>
+
         </div>
       </div>
     </div>

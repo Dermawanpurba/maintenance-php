@@ -272,5 +272,40 @@ export const api = {
 
   async saveSettings(data: any) {
     return this.postAction('saveSettings', data);
-  }
+  },
+
+  // ==================== SCHEDULED OIL SAMPLING (SOS) ====================
+  async saveOilSample(data: any) {
+    return this.postAction('saveOilSample', data);
+  },
+
+  async deleteOilSample(id: string | number) {
+    return this.postAction('deleteOilSample', { id });
+  },
+
+  // ==================== TARGET JAM OPERASI (PLAN ALAT) ====================
+  async getTargetJamOperasi(year: number, month: number) {
+    return this.postAction('getTargetJamOperasi', { plan_year: year, plan_month: month });
+  },
+
+  async savePlanAlatRow(data: any) {
+    return this.postAction('savePlanAlatRow', data);
+  },
+
+  async deletePlanAlatRow(id: number | string) {
+    return this.postAction('deletePlanAlatRow', { id });
+  },
+
+  async saveJamHarian(data: { equip_no: string; plan_year: number; plan_month: number; plan_day: number; jam_rencana: number }) {
+    return this.postAction('saveJamHarian', data);
+  },
+
+  async bulkSaveJamHarian(data: { equip_no: string; plan_year: number; plan_month: number; days: { day: number; jam: number }[] }) {
+    return this.postAction('bulkSaveJamHarian', data);
+  },
+
+  async seedDemoTargetJam(year: number = 2024, month: number = 6) {
+    return this.postAction('seedDemoTargetJam', { plan_year: year, plan_month: month });
+  },
 };
+

@@ -281,3 +281,136 @@ export interface SettingsData {
   wa_gateway?: string;
   [key: string]: any;
 }
+
+export interface OilSample {
+  id?: number | string;
+  item_id?: string;
+  sample_code: string;
+  equip_no: string;
+  compartment: string;
+  sample_date: string;
+  hm: number;
+  oil_grade?: string;
+  rating: 'A' | 'B' | 'C' | 'X' | 'D' | string;
+  top_up?: number;
+  repair_notes?: string;
+  si?: number;
+  al?: number;
+  na?: number;
+  fe?: number;
+  cu?: number;
+  cr?: number;
+  pb?: number;
+  pq?: number;
+  visc_100?: number;
+  oxi?: number;
+  soot?: number;
+  tbn?: number;
+  iso_6?: number;
+  iso_14?: number;
+  water_pct?: number;
+  interpretation?: string;
+  lab_vendor?: string;
+  status?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface MaintenanceWeek {
+  id: number;
+  week_no: string;
+  label?: string;
+  start_date?: string;
+  end_date?: string;
+  is_active?: boolean;
+  target_compliance?: number;
+  notes?: string;
+}
+
+export interface PpuRecord {
+  id?: number | string;
+  unit_no: string;
+  model?: string;
+  track_group_used?: string;
+  cts_date?: string;
+  last_fitted_track_group?: string;
+  pct_hours_track?: number;
+  hours_track_gp?: number;
+  smu?: number;
+  // Sprocket (3 Teeth mm)
+  sprocket_lh?: number;
+  sprocket_rh?: number;
+  // Track Link — Link Height
+  link_height_lh?: number;
+  link_height_rh?: number;
+  // Track Link — Chain Bushing
+  chain_bushing_lh?: number;
+  chain_bushing_rh?: number;
+  // Track Link — Frame Extension
+  frame_ext_lh?: number;
+  frame_ext_rh?: number;
+  // Track Shoe — Grouser Height
+  grouser_height_lh?: number;
+  grouser_height_rh?: number;
+  // Idler Front
+  idler_front_lh?: number;
+  idler_front_rh?: number;
+  // Idler Rear
+  idler_rear_lh?: number;
+  idler_rear_rh?: number;
+  // Metadata
+  inspection_date?: string;
+  inspector?: string;
+  notes?: string;
+  status?: 'NORMAL' | 'CAUTION' | 'CRITICAL' | string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TargetJamOperasi {
+  id?: number | string;
+  equip_no: string;
+  section?: string;
+  model?: string;
+  est_hm?: number;
+  est_hm_date?: string;
+  status?: string;
+  next_service_hours_due?: number;
+  next_service_hours_due_2?: number;
+  next_service_type_hm?: number;
+  next_service_type?: string;
+  next_service_type_2?: string;
+  next_service_date?: string;
+  next_service_date_2?: string;
+  pm_250?: number;
+  pm_500?: number;
+  pm_1000?: number;
+  pm_2000?: number;
+  pm_4000?: number;
+  pm_other?: number;
+  downtime_pm?: number;
+  downtime_backlog?: number;
+  downtime_midlife?: number;
+  downtime_pcr?: number;
+  ba_gg?: number;
+  oil_fe?: number;
+  pos?: number;
+  plan_year?: number;
+  plan_month?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TargetJamHarian {
+  id?: number | string;
+  equip_no: string;
+  plan_year: number;
+  plan_month: number;
+  plan_day: number;
+  jam_rencana: number;
+  downtime_type?: 'PM' | 'BD' | 'BACKLOG' | 'MIDLIFE' | 'PCR' | string;
+  created_at?: string;
+  updated_at?: string;
+}

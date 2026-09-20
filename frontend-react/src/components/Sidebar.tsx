@@ -30,7 +30,11 @@ import {
   X,
   Boxes,
   UserCheck,
-  Users
+  Users,
+  Layers,
+  Disc,
+  Activity,
+  CalendarDays
 } from 'lucide-react';
 
 export type NavTab =
@@ -39,19 +43,31 @@ export type NavTab =
   | 'database_3d'
   | 'wo'
   | 'backlog'
+  | 'bm_dashboard'
+  | 'bm_inspection'
+  | 'bm_greasing'
+  | 'bm_washing'
+  | 'bm_ac_electrical'
+  | 'bm_bucket_blade'
+  | 'bm_undercarriage'
+  | 'bm_retorque'
+  | 'bm_tyre'
   | 'pm_washing'
   | 'pm_greasing'
   | 'pm_inspection'
   | 'pm_torque'
   | 'pm_battery'
   | 'pcr'
+  | 'ppu'
   | 'swab'
   | 'far'
+  | 'sos'
   | 'p2h'
   | 'daily_hm'
   | 'aktifitas'
   | 'monthly_budget'
   | 'meetings'
+  | 'target_jam_operasi'
   | 'fleet'
   | 'parts'
   | 'tools'
@@ -102,6 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     exec: true,
     wo: true,
+    bm: true,
     pm: true,
     reliability: false,
     daily: false,
@@ -140,16 +157,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      id: 'pm',
-      label: 'Preventive Maintenance',
-      icon: ShieldCheck,
+      id: 'bm',
+      label: 'Basic Maintenance',
+      icon: Wrench,
       iconColor: 'text-emerald-400',
       items: [
-        { id: 'pm_washing', label: '1. Washing & Cleaning', icon: Droplets, iconColor: 'text-cyan-400' },
-        { id: 'pm_greasing', label: '2. Greasing Full Points', icon: Wrench, iconColor: 'text-amber-400' },
-        { id: 'pm_inspection', label: '3. General Inspection', icon: ShieldCheck, iconColor: 'text-sky-400' },
-        { id: 'pm_torque', label: '4. Pengencangan / Torque', icon: Hammer, iconColor: 'text-rose-400' },
-        { id: 'pm_battery', label: '5. Battery & Electrical', icon: Zap, iconColor: 'text-purple-400' }
+        { id: 'bm_dashboard', label: 'Overview & Weekly Trends', icon: LayoutDashboard, iconColor: 'text-blue-400' },
+        { id: 'bm_inspection', label: '1. Weekly Inspection', icon: ShieldCheck, iconColor: 'text-sky-400' },
+        { id: 'bm_greasing', label: '2. Daily Greasing', icon: Wrench, iconColor: 'text-amber-400' },
+        { id: 'bm_washing', label: '3. Washing', icon: Droplets, iconColor: 'text-cyan-400' },
+        { id: 'bm_ac_electrical', label: '4. AC & Electrical', icon: Zap, iconColor: 'text-purple-400' },
+        { id: 'bm_bucket_blade', label: '5. Bucket / Blade / Wheel', icon: Hammer, iconColor: 'text-orange-400' },
+        { id: 'bm_undercarriage', label: '6. Clean Up UC & Chassis', icon: Layers, iconColor: 'text-teal-400' },
+        { id: 'bm_retorque', label: '7. Retorque (UC / Wheel)', icon: Hammer, iconColor: 'text-rose-400' },
+        { id: 'bm_tyre', label: '8. Tyre & Track Sag', icon: Disc, iconColor: 'text-indigo-400' }
       ]
     },
     {
@@ -158,9 +179,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Microscope,
       iconColor: 'text-orange-400',
       items: [
-        { id: 'pcr', label: 'Plan Component (PCR)', icon: Cpu, iconColor: 'text-orange-400' },
-        { id: 'swab', label: 'Swab Component', icon: Repeat, iconColor: 'text-pink-400' },
-        { id: 'far', label: 'Failure Analysis (FAR)', icon: AlertTriangle, iconColor: 'text-red-400' }
+        { id: 'pcr',  label: 'Plan Component (PCR)',       icon: Cpu,          iconColor: 'text-orange-400' },
+        { id: 'ppu',  label: 'Pemeriksaan UC (PPU)',        icon: Activity,     iconColor: 'text-teal-400'   },
+        { id: 'sos',  label: 'Oil Sampling (SOS)',          icon: Droplets,     iconColor: 'text-amber-400'  },
+        { id: 'swab', label: 'Swab Component',              icon: Repeat,       iconColor: 'text-pink-400'   },
+        { id: 'far',  label: 'Failure Analysis (FAR)',      icon: AlertTriangle, iconColor: 'text-red-400'   }
       ]
     },
     {
@@ -181,6 +204,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       iconColor: 'text-emerald-400',
       items: [
         { id: 'monthly_budget', label: 'Plan Budget Bulanan', icon: Wallet, iconColor: 'text-emerald-300' },
+        { id: 'target_jam_operasi', label: 'Target Jam Operasi', icon: CalendarDays, iconColor: 'text-blue-400' },
         { id: 'meetings', label: 'Notulen Rapat Plant', icon: FileText, iconColor: 'text-yellow-300' }
       ]
     },

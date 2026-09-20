@@ -158,13 +158,17 @@ export const FailureAnalysisView: React.FC<FailureAnalysisViewProps> = ({ fars, 
               ) : (
                 filtered.map((far, idx) => {
                   const eq = far.equip_no || far.no_unit || '-';
-                  const comp = far.damage_part || far.component || '-';
+                  const comp = far.damage_part || far.component || (far as any).component_name || '-';
                   const date = far.incident_date || far.tanggal || '-';
+                  const rawId = String(far.far_number || far.item_id || far.id || '');
+                  const farNumber = rawId.startsWith('FAR-') ? rawId : (rawId ? `FAR-${rawId}` : '-');
+                  const rca = far.root_cause || (far as any).chronology || '-';
+                  const investigator = far.pic || far.leader || (far as any).lead_investigator || '-';
 
                   return (
                     <tr key={far.id || idx} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3.5 px-4 font-mono font-bold text-red-600">
-                        {far.far_number || `FAR-${far.id}`}
+                        {farNumber}
                       </td>
                       <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{date}</td>
                       <td className="py-3.5 px-4">
@@ -173,13 +177,13 @@ export const FailureAnalysisView: React.FC<FailureAnalysisViewProps> = ({ fars, 
                         </span>
                       </td>
                       <td className="py-3.5 px-4 font-bold text-slate-800">{comp}</td>
-                      <td className="py-3.5 px-4 max-w-xs truncate text-slate-600" title={far.root_cause}>
-                        {far.root_cause || '-'}
+                      <td className="py-3.5 px-4 max-w-xs truncate text-slate-600" title={rca}>
+                        {rca}
                       </td>
                       <td className="py-3.5 px-4 max-w-xs truncate text-emerald-700 font-medium" title={far.corrective_action}>
                         {far.corrective_action || '-'}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-500 font-medium">{far.pic || far.leader || '-'}</td>
+                      <td className="py-3.5 px-4 text-slate-500 font-medium">{investigator}</td>
                       <td className="py-3.5 px-4 text-center">
                         <div className="flex items-center justify-center space-x-1.5">
                           <button
@@ -218,9 +222,9 @@ export const FailureAnalysisView: React.FC<FailureAnalysisViewProps> = ({ fars, 
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-800">
-                    Detail Failure Analysis Report: {selectedFAR.far_number || `FAR-${selectedFAR.id}`}
+                    Detail Failure Analysis Report: {String(selectedFAR.far_number || selectedFAR.item_id || selectedFAR.id).startsWith('FAR-') ? (selectedFAR.far_number || selectedFAR.item_id || selectedFAR.id) : `FAR-${selectedFAR.id}`}
                   </h3>
-                  <p className="text-xs text-slate-400">Unit: {selectedFAR.equip_no || selectedFAR.no_unit} • Komponen: {selectedFAR.damage_part || selectedFAR.component}</p>
+                  <p className="text-xs text-slate-400">Unit: {selectedFAR.equip_no || selectedFAR.no_unit} • Komponen: {selectedFAR.damage_part || selectedFAR.component || (selectedFAR as any).component_name}</p>
                 </div>
               </div>
               <button onClick={() => setSelectedFAR(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">

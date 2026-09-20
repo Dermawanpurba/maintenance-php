@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, RefreshCw, Download, Shield, ExternalLink, Activity, AlertTriangle, Printer } from 'lucide-react';
+import { Menu, RefreshCw, Shield, ExternalLink, Activity, AlertTriangle, Printer } from 'lucide-react';
 import { NavTab } from './Sidebar';
 
 interface HeaderProps {
@@ -9,7 +9,6 @@ interface HeaderProps {
   latency: number;
   onRefresh: () => void;
   refreshing: boolean;
-  onBackup: () => void;
   onOpenBDAwal?: () => void;
   onPrintExecSummary?: () => void;
 }
@@ -40,6 +39,51 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     subtitle: 'Daftar temuan defect inspeksi, urgensi penanganan, dan antrean suku cadang',
     tag: 'DEFECT LOG'
   },
+  bm_dashboard: {
+    title: 'Basic Maintenance Executive Overview & Weekly Trends',
+    subtitle: 'Grafik pemantauan tren kepatuhan mingguan (Week 40 - Week 43) dan matriks performa plant',
+    tag: 'BASIC MAINTENANCE'
+  },
+  bm_inspection: {
+    title: 'Basic Maintenance: 1. Weekly Inspection',
+    subtitle: 'Pemeriksaan rutin mingguan kebocoran fluida, level oli hidrolik, dan integritas struktur',
+    tag: 'BASIC MAINTENANCE'
+  },
+  bm_greasing: {
+    title: 'Basic Maintenance: 2. Daily Greasing',
+    subtitle: 'Pelumasan grease harian pada seluruh titik pin, bushing, swing circle, dan idler',
+    tag: 'BASIC MAINTENANCE'
+  },
+  bm_washing: {
+    title: 'Basic Maintenance: 3. Washing & Undercarriage Cleaning',
+    subtitle: 'Pencucian lumpur bertekanan tinggi dan pembersihan kisi radiator unit tambang',
+    tag: 'BASIC MAINTENANCE'
+  },
+  bm_ac_electrical: {
+    title: 'Basic Maintenance: 4. AC & Electrical System',
+    subtitle: 'Pengujian performa AC kabin, alternator charging 28V, motor starter, dan accu',
+    tag: 'BASIC MAINTENANCE'
+  },
+  bm_bucket_blade: {
+    title: 'Basic Maintenance: 5. Bucket / Blade / Wheel & Vessel',
+    subtitle: 'Inspeksi adaptif model: Excavator (Tooth Bucket), Dump Truck (Wheel & Vessel), Dozer (Blade), Loader',
+    tag: 'BASIC MAINTENANCE'
+  },
+  bm_undercarriage: {
+    title: 'Basic Maintenance: 6. Clean Up UC & Chassis',
+    subtitle: 'Pembersihan endapan lumpur padat pada frame track undercarriage atau kolong sasis roda & spakbor',
+    tag: 'BASIC MAINTENANCE'
+  },
+  bm_retorque: {
+    title: 'Basic Maintenance: 7. Retorque Component (UC / Wheel)',
+    subtitle: 'Audit kekencangan torsi baut track shoe (580 Nm) atau baut roda dump truck (850 Nm) / loader (900 Nm)',
+    tag: 'BASIC MAINTENANCE'
+  },
+  bm_tyre: {
+    title: 'Basic Maintenance: 8. Tyre & Track Sag Inspection',
+    subtitle: 'Pengukuran tekanan ban (105 PSI) & tread depth atau kekenduran rantai track sag (25-35 mm) & grouser',
+    tag: 'BASIC MAINTENANCE'
+  },
   pm_washing: {
     title: 'PM Hub: 1. Unit Washing & Undercarriage Cleaning',
     subtitle: 'Pencucian lumpur bertekanan tinggi dan pembersihan radiator unit tambang',
@@ -69,6 +113,16 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     title: 'Plan Component Replacement (PCR)',
     subtitle: 'Jadwal peremajaan komponen utama (Engine, Transmission, Hydraulic Pump) terencana',
     tag: 'RELIABILITY'
+  },
+  ppu: {
+    title: 'Program Pemeriksaan Undercarriage (PPU)',
+    subtitle: 'Pengukuran keausan sprocket, track link, track shoe, dan idler unit alat berat berkala',
+    tag: 'UC INSPECTION'
+  },
+  sos: {
+    title: 'Scheduled Oil Sampling (SOS) & Condition Monitoring',
+    subtitle: 'Pemantauan laboratorium pelumas, tren wear metals, kontaminasi, dan keandalan armada',
+    tag: 'CONDITION MONITORING'
   },
   swab: {
     title: 'Swab & Kanibalisasi Komponen',
@@ -104,6 +158,11 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     title: 'Notulen Rapat & Koordinasi Plant Bulanan',
     subtitle: 'Catatan hasil evaluasi mingguan, target KPI, dan instruksi manajemen plant',
     tag: 'COORDINATION'
+  },
+  target_jam_operasi: {
+    title: 'Target Jam Operasi — Plan Alat Bulanan',
+    subtitle: 'Rencana jam operasi harian per unit alat berat, next service, PM type, dan periode kalender',
+    tag: 'PLAN ALAT'
   },
   fleet: {
     title: 'Master Unit & Monitoring Armada Alat Berat',
@@ -149,7 +208,6 @@ export const Header: React.FC<HeaderProps> = ({
   latency,
   onRefresh,
   refreshing,
-  onBackup,
   onOpenBDAwal,
   onPrintExecSummary
 }) => {
@@ -240,16 +298,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* 1-Click Backup */}
-        <button
-          onClick={onBackup}
-          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold shadow-sm transition-all hover:shadow-md active:scale-95"
-          title="Unduh Backup Database .ZIP"
-          type="button"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Backup .ZIP</span>
-        </button>
 
         {/* Filament Admin Link */}
         <a

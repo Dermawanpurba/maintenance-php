@@ -55,6 +55,14 @@ class PmRecordInfolist
                 TextEntry::make('updated_at')
                     ->dateTime()
                     ->placeholder('-'),
+                TextEntry::make('week_no')
+                    ->placeholder('-'),
+                TextEntry::make('achievement_pct')
+                    ->numeric()
+                    ->placeholder('-'),
+                TextEntry::make('checklist_json')
+                    ->placeholder('-')
+                    ->columnSpanFull(),
             ]);
     }
 }

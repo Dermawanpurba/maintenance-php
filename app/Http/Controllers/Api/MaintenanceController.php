@@ -31,6 +31,11 @@ use App\Models\MeetingNote;
 use App\Models\MasterTool;
 use App\Models\Setting;
 use App\Models\SystemLog;
+use App\Models\OilSample;
+use App\Models\MaintenanceWeek;
+use App\Models\PpuRecord;
+use App\Models\TargetJamOperasi;
+use App\Models\TargetJamHarian;
 
 class MaintenanceController extends Controller
 {
@@ -104,6 +109,10 @@ class MaintenanceController extends Controller
 
                 case 'getAllUserAccess':
                     return response()->json(['success' => true, 'access' => UserAccess::all()]);
+
+                case 'saveStock':
+                    $data['type'] = 'part';
+                    return response()->json($this->saveMaster($data));
 
                 case 'getSystemLogs':
                     return response()->json(['success' => true, 'logs' => SystemLog::orderByDesc('id')->limit(100)->get()]);
@@ -203,12 +212,24 @@ class MaintenanceController extends Controller
                 case 'deletePCR':
                     return response()->json($this->deletePCR($data));
 
-                // PM Records
+                // Basic Maintenance / PM Records
                 case 'savePMRecord':
+                case 'saveBasicMaintenance':
                     return response()->json($this->savePMRecord($data));
 
                 case 'deletePMRecord':
+                case 'deleteBasicMaintenance':
                     return response()->json($this->deletePMRecord($data));
+
+                // Maintenance Weeks (Period Database)
+                case 'getMaintenanceWeeks':
+                    return response()->json(['success' => true, 'weeks' => MaintenanceWeek::orderBy('id', 'asc')->get()]);
+
+                case 'saveMaintenanceWeek':
+                    return response()->json($this->saveMaintenanceWeek($data));
+
+                case 'deleteMaintenanceWeek':
+                    return response()->json($this->deleteMaintenanceWeek($data));
 
                 // Budget & Cost
                 case 'saveMonthlyBudget':
@@ -246,6 +267,48 @@ class MaintenanceController extends Controller
 
                 case 'deleteMeetingNotes':
                     return response()->json($this->deleteMeetingNotes($data));
+
+                // Scheduled Oil Sampling (SOS)
+                case 'getOilSamples':
+                    return response()->json(['success' => true, 'data' => OilSample::orderByDesc('id')->get()]);
+
+                case 'saveOilSample':
+                    return response()->json($this->saveOilSample($data));
+
+                case 'deleteOilSample':
+                    return response()->json($this->deleteOilSample($data));
+
+                // PPU — Program Pemeriksaan Undercarriage
+                case 'getPpuRecords':
+                    return response()->json(['success' => true, 'data' => PpuRecord::orderByDesc('id')->get()]);
+
+                case 'savePpuRecord':
+                    return response()->json($this->savePpuRecord($data));
+
+                case 'deletePpuRecord':
+                    return response()->json($this->deletePpuRecord($data));
+
+                // Target Jam Operasi (Plan Alat)
+                case 'getTargetJamOperasi':
+                    return response()->json($this->getTargetJamOperasi($data));
+
+                case 'savePlanAlatRow':
+                    return response()->json($this->savePlanAlatRow($data));
+
+                case 'deletePlanAlatRow':
+                    return response()->json($this->deletePlanAlatRow($data));
+
+                case 'saveJamHarian':
+                    return response()->json($this->saveJamHarian($data));
+
+                case 'deleteJamHarian':
+                    return response()->json($this->deleteJamHarian($data));
+
+                case 'bulkSaveJamHarian':
+                    return response()->json($this->bulkSaveJamHarian($data));
+
+                case 'seedDemoTargetJam':
+                    return response()->json($this->seedDemoTargetJam($data));
 
                 default:
                     return response()->json(['success' => false, 'message' => "Action '{$action}' tidak dikenal"]);
@@ -365,7 +428,27 @@ class MaintenanceController extends Controller
                 return $arr;
             })->values()->all(),
             'serviceHistory' => $this->mapRecords(ServiceHistory::all()),
-            'inspections' => $this->mapRecords(Inspection::all()),
+            'inspections' => Inspection::orderByDesc('id')->get()->map(function($insp) {
+                $arr = $insp->toArray();
+                $arr['id'] = $arr['item_id'] ?? $arr['id'];
+                $decoded = json_decode($arr['checklist_json'] ?? '[]', true);
+                if (is_array($decoded) && isset($decoded['items'])) {
+                    $arr['items'] = $decoded['items'];
+                    $arr['shift'] = $decoded['shift'] ?? ($arr['shift'] ?? 'Shift 1');
+                    $arr['result'] = $decoded['status'] ?? ($arr['status'] ?? 'RFU');
+                    $arr['status'] = $arr['result'];
+                    $arr['catatan'] = $decoded['catatan'] ?? ($arr['catatan'] ?? '');
+                    $arr['tipe_alat'] = $decoded['tipe_alat'] ?? ($arr['tipe_alat'] ?? '');
+                    $arr['fail_count'] = $decoded['fail_count'] ?? 0;
+                    $arr['warning_count'] = $decoded['warning_count'] ?? 0;
+                } else {
+                    $arr['items'] = is_array($decoded) ? $decoded : [];
+                    $arr['result'] = $arr['status'] ?? 'RFU';
+                    $arr['fail_count'] = 0;
+                    $arr['warning_count'] = 0;
+                }
+                return $arr;
+            })->values()->all(),
             'pcr' => $this->mapRecords(PcrComponent::all()),
             'pmRecords' => $this->mapRecords(PmRecord::all()),
             'monthlyBudget' => MonthlyBudget::all()->map(function($b) {
@@ -380,8 +463,40 @@ class MaintenanceController extends Controller
             })->values()->all(),
             'equipmentCosts' => $this->mapRecords(EquipmentCost::all()),
             'equipmentProductivity' => [],
-            'farRecords' => $this->mapRecords(FailureAnalysis::all()),
-            'swabComponents' => $this->mapRecords(SwabComponent::all()),
+            'farRecords' => FailureAnalysis::all()->map(function($f) {
+                $arr = $f->toArray();
+                $rawId = $arr['item_id'] ?? $arr['id'];
+                $arr['id'] = $rawId;
+                $arr['far_number'] = str_starts_with((string)$rawId, 'FAR-') ? $rawId : "FAR-{$rawId}";
+                $arr['component'] = $arr['component_name'] ?? ($arr['component'] ?? '');
+                $arr['damage_part'] = $arr['component'];
+                $arr['component_name'] = $arr['component'];
+                $arr['no_unit'] = $arr['equip_no'] ?? ($arr['no_unit'] ?? '');
+                
+                // Ekstrak root cause dari five_why_json atau chronology
+                $rootCause = '';
+                if (!empty($arr['five_why_json'])) {
+                    $decoded = is_string($arr['five_why_json']) ? json_decode($arr['five_why_json'], true) : $arr['five_why_json'];
+                    if (is_array($decoded)) {
+                        $nonEmpty = array_values(array_filter($decoded, fn($w) => !empty(trim((string)$w))));
+                        if (!empty($nonEmpty)) {
+                            $rootCause = end($nonEmpty);
+                        }
+                    }
+                }
+                $arr['root_cause'] = $rootCause ?: ($arr['chronology'] ?? '-');
+                $arr['pic'] = $arr['lead_investigator'] ?? ($arr['pic'] ?? ($arr['leader'] ?? '-'));
+                return $arr;
+            })->values()->all(),
+            'swabComponents' => SwabComponent::all()->map(function($s) {
+                $arr = $s->toArray();
+                $arr['id'] = $arr['item_id'] ?? $arr['id'];
+                $arr['recipient_unit'] = $arr['target_unit'] ?? ($arr['recipient_unit'] ?? '');
+                $arr['target_unit'] = $arr['recipient_unit'];
+                $arr['pic'] = $arr['authorized_by'] ?? ($arr['mechanic'] ?? ($arr['pic'] ?? '-'));
+                $arr['authorized_by'] = $arr['pic'];
+                return $arr;
+            })->values()->all(),
             'meetingNotes' => MeetingNote::all()->map(function($m) {
                 $arr = $m->toArray();
                 $arr['id'] = $arr['item_id'] ?? $arr['id'];
@@ -395,7 +510,12 @@ class MaintenanceController extends Controller
             'userAccess' => $userAccessMap,
             'settings' => $this->getSettingsArray(),
             'planHours' => $planAlat,
-            'systemLogs' => $this->mapRecords(SystemLog::orderByDesc('id')->limit(50)->get())
+            'oilSamples' => $this->mapRecords(OilSample::orderByDesc('id')->get()),
+            'ppuRecords' => PpuRecord::orderByDesc('id')->get()->toArray(),
+            'maintenanceWeeks' => MaintenanceWeek::orderBy('id', 'asc')->get()->toArray(),
+            'systemLogs' => $this->mapRecords(SystemLog::orderByDesc('id')->limit(50)->get()),
+            'targetJamOperasi' => TargetJamOperasi::orderBy('section')->orderBy('equip_no')->get()->toArray(),
+            'targetJamHarian' => TargetJamHarian::all()->toArray(),
         ];
     }
 
@@ -487,8 +607,11 @@ class MaintenanceController extends Controller
     public function saveUserAccess($data)
     {
         $username = $data['username'] ?? '';
-        $features = $data['features'] ?? [];
-        if (is_string($features)) $features = json_decode($features, true) ?: [$features];
+        $features = $data['features'] ?? ($data['feature'] ?? []);
+        if (is_string($features)) {
+            $decoded = json_decode($features, true);
+            $features = is_array($decoded) ? $decoded : [$features];
+        }
 
         UserAccess::where('username', $username)->delete();
         foreach ($features as $f) {
@@ -503,9 +626,13 @@ class MaintenanceController extends Controller
 
     public function deleteUserAccess($data)
     {
-        UserAccess::where('username', $data['username'] ?? '')
-            ->where('feature', $data['feature'] ?? '')
-            ->delete();
+        if (!empty($data['id'])) {
+            UserAccess::whereKey($data['id'])->delete();
+        } else {
+            UserAccess::where('username', $data['username'] ?? '')
+                ->where('feature', $data['feature'] ?? '')
+                ->delete();
+        }
         return ['success' => true, 'message' => 'Hak akses dihapus'];
     }
 
@@ -644,6 +771,16 @@ class MaintenanceController extends Controller
         ];
 
         DailyHm::updateOrCreate(['item_id' => $id], $fields);
+
+        // Auto-sync HM terbaru ke MasterEquip dan TargetJamOperasi bulan berjalan
+        if ($hm_akhir > 0 && !empty($equip_no)) {
+            MasterEquip::where('equip_no', $equip_no)->update(['last_hm' => $hm_akhir]);
+            TargetJamOperasi::where('equip_no', $equip_no)
+                ->where('plan_year', intval(date('Y')))
+                ->where('plan_month', intval(date('n')))
+                ->update(['est_hm' => $hm_akhir]);
+        }
+
         return ['success' => true, 'message' => 'Daily HM berhasil disimpan', 'id' => $id];
     }
 
@@ -730,6 +867,36 @@ class MaintenanceController extends Controller
                     'warranty_status' => $payload['warranty_status'] ?? 'Active'
                 ];
                 MasterEquip::updateOrCreate(['equip_no' => $equipNo], $cleanPayload);
+
+                // Auto-sync ke TargetJamOperasi periode berjalan
+                $curYear = intval(date('Y'));
+                $curMonth = intval(date('n'));
+                $lastHm = floatval($payload['last_hm'] ?? 0);
+                $due1 = ceil(($lastHm + 1) / 250) * 250;
+                $due2 = $due1 + 250;
+                $calcType = function($due) {
+                    if ($due % 4000 === 0) return '4000';
+                    if ($due % 2000 === 0) return '2000';
+                    if ($due % 1000 === 0) return '1000';
+                    if ($due % 500 === 0) return '500';
+                    return '250';
+                };
+                $type1 = $calcType($due1);
+                $type2 = $calcType($due2);
+
+                TargetJamOperasi::updateOrCreate(
+                    ['equip_no' => $equipNo, 'plan_year' => $curYear, 'plan_month' => $curMonth],
+                    [
+                        'model'                    => $payload['model'] ?? '',
+                        'section'                  => $payload['section'] ?? ($payload['tipe'] ?? 'MINING'),
+                        'status'                   => strtoupper($payload['status'] ?? 'RFU'),
+                        'est_hm'                   => $lastHm,
+                        'next_service_hours_due'   => $due1,
+                        'next_service_hours_due_2' => $due2,
+                        'next_service_type'        => $type1,
+                        'next_service_type_2'      => $type2,
+                    ]
+                );
                 break;
             case 'PlanAlat':
                 PlanAlat::updateOrCreate(['equip_no' => $payload['equip_no']], [
@@ -806,6 +973,8 @@ class MaintenanceController extends Controller
         MasterEquip::where('equip_no', $equip_no)->delete();
         PlanAlat::where('equip_no', $equip_no)->delete();
         PlanService::where('equip_no', $equip_no)->delete();
+        TargetJamOperasi::where('equip_no', $equip_no)->delete();
+        TargetJamHarian::where('equip_no', $equip_no)->delete();
         return ['success' => true, 'message' => "Alat {$equip_no} berhasil dihapus"];
     }
 
@@ -897,18 +1066,34 @@ class MaintenanceController extends Controller
     public function saveInspection($data)
     {
         $id = $data['id'] ?? $data['item_id'] ?? ('INSP-' . time());
+        $items = $data['items'] ?? $data['checklist_json'] ?? [];
+        if (is_string($items)) {
+            $decoded = json_decode($items, true);
+            $items = is_array($decoded) ? $decoded : [];
+        }
+
+        $structuredPayload = [
+            'items' => $items,
+            'shift' => $data['shift'] ?? 'Shift 1',
+            'status' => $data['status'] ?? ($data['result'] ?? 'RFU'),
+            'catatan' => $data['catatan'] ?? '',
+            'tipe_alat' => $data['tipe_alat'] ?? '',
+            'fail_count' => $data['fail_count'] ?? 0,
+            'warning_count' => $data['warning_count'] ?? 0,
+        ];
+
         $fields = [
             'item_id' => $id,
             'tanggal' => $data['tanggal'] ?? date('Y-m-d'),
             'equip_no' => $data['equip_no'] ?? '',
             'tipe_alat' => $data['tipe_alat'] ?? '',
-            'checklist_json' => is_array($data['checklist_json'] ?? null) ? json_encode($data['checklist_json']) : ($data['checklist_json'] ?? '[]'),
+            'checklist_json' => json_encode($structuredPayload),
             'inspector' => $data['inspector'] ?? '',
             'timestamp' => now()->format('Y-m-d H:i:s')
         ];
 
         Inspection::updateOrCreate(['item_id' => $id], $fields);
-        return ['success' => true, 'message' => 'Inspeksi berhasil disimpan', 'id' => $id];
+        return ['success' => true, 'message' => 'Inspeksi P2H berhasil disimpan', 'id' => $id];
     }
 
     public function deleteInspection($data)
@@ -961,8 +1146,13 @@ class MaintenanceController extends Controller
             'battery_check' => $data['battery_check'] ?? 'OK',
             'mechanic' => $data['mechanic'] ?? '',
             'notes' => $data['notes'] ?? '',
-            'hm_pm' => $data['hm_pm'] ?? 0,
-            'status' => $data['status'] ?? 'Completed'
+            'hm_pm' => floatval($data['hm_pm'] ?? 0),
+            'status' => $data['status'] ?? 'Completed',
+            'week_no' => $data['week_no'] ?? 'WEEK 43',
+            'achievement_pct' => floatval($data['achievement_pct'] ?? 100),
+            'checklist_json' => is_array($data['checklist_json'] ?? null)
+                ? json_encode($data['checklist_json'])
+                : ($data['checklist_json'] ?? '[]')
         ];
 
         PmRecord::updateOrCreate(['item_id' => $id], $fields);
@@ -971,9 +1161,44 @@ class MaintenanceController extends Controller
 
     public function deletePMRecord($data)
     {
-        $id = is_array($data) ? ($data['id'] ?? $data['pm_id'] ?? '') : $data;
+        $id = is_array($data) ? ($data['id'] ?? $data['pm_id'] ?? $data['item_id'] ?? '') : $data;
         PmRecord::where('item_id', $id)->orWhere('id', $id)->delete();
         return ['success' => true, 'message' => 'PM Record berhasil dihapus'];
+    }
+
+    // ==================== MAINTENANCE WEEKS ====================
+    public function saveMaintenanceWeek($data)
+    {
+        $id = $data['id'] ?? null;
+        $weekNo = trim($data['week_no'] ?? '');
+        if (empty($weekNo)) {
+            return ['success' => false, 'message' => 'Nama / nomor minggu wajib diisi'];
+        }
+
+        if (!empty($data['is_active'])) {
+            MaintenanceWeek::where('is_active', true)->update(['is_active' => false]);
+        }
+
+        $week = MaintenanceWeek::updateOrCreate(
+            $id ? ['id' => $id] : ['week_no' => $weekNo],
+            [
+                'week_no' => $weekNo,
+                'label' => $data['label'] ?? $weekNo,
+                'start_date' => $data['start_date'] ?? null,
+                'end_date' => $data['end_date'] ?? null,
+                'is_active' => !empty($data['is_active']),
+                'target_compliance' => intval($data['target_compliance'] ?? 100),
+                'notes' => $data['notes'] ?? ''
+            ]
+        );
+        return ['success' => true, 'message' => 'Periode minggu berhasil disimpan', 'week' => $week];
+    }
+
+    public function deleteMaintenanceWeek($data)
+    {
+        $id = is_array($data) ? ($data['id'] ?? $data['week_no'] ?? '') : $data;
+        MaintenanceWeek::where('id', $id)->orWhere('week_no', $id)->delete();
+        return ['success' => true, 'message' => 'Periode minggu berhasil dihapus'];
     }
 
     // ==================== BUDGET & COST ====================
@@ -1034,19 +1259,30 @@ class MaintenanceController extends Controller
     // ==================== FAILURE ANALYSIS (FAR) ====================
     public function saveFAR($data)
     {
-        $id = $data['id'] ?? $data['item_id'] ?? ('FAR-' . time());
+        $id = $data['id'] ?? $data['item_id'] ?? $data['far_number'] ?? ('FAR-' . rand(100, 999));
+        $fiveWhy = $data['five_why_json'] ?? null;
+        if (empty($fiveWhy) && (!empty($data['why_1']) || !empty($data['why_2']))) {
+            $fiveWhy = array_values(array_filter([
+                $data['why_1'] ?? '',
+                $data['why_2'] ?? '',
+                $data['why_3'] ?? '',
+                $data['why_4'] ?? '',
+                $data['why_5'] ?? '',
+            ]));
+        }
+
         $fields = [
             'item_id' => $id,
-            'tanggal' => $data['tanggal'] ?? date('Y-m-d'),
-            'equip_no' => $data['equip_no'] ?? '',
-            'component_name' => $data['component_name'] ?? '',
-            'chronology' => $data['chronology'] ?? '',
-            'five_why_json' => is_array($data['five_why_json'] ?? null) ? json_encode($data['five_why_json']) : ($data['five_why_json'] ?? '{}'),
+            'tanggal' => $data['tanggal'] ?? ($data['incident_date'] ?? date('Y-m-d')),
+            'equip_no' => $data['equip_no'] ?? ($data['no_unit'] ?? ''),
+            'component_name' => $data['component_name'] ?? ($data['damage_part'] ?? ($data['component'] ?? '')),
+            'chronology' => $data['chronology'] ?? ($data['root_cause'] ?? ''),
+            'five_why_json' => is_array($fiveWhy) ? json_encode($fiveWhy) : (is_string($fiveWhy) ? $fiveWhy : '{}'),
             'fishbone_json' => is_array($data['fishbone_json'] ?? null) ? json_encode($data['fishbone_json']) : ($data['fishbone_json'] ?? '{}'),
             'corrective_action' => $data['corrective_action'] ?? '',
             'preventive_action' => $data['preventive_action'] ?? '',
-            'status' => $data['status'] ?? 'Open',
-            'lead_investigator' => $data['lead_investigator'] ?? ''
+            'status' => strtoupper($data['status'] ?? 'OPEN'),
+            'lead_investigator' => $data['lead_investigator'] ?? ($data['pic'] ?? ($data['leader'] ?? 'Tim Reliability PMC'))
         ];
 
         FailureAnalysis::updateOrCreate(['item_id' => $id], $fields);
@@ -1055,7 +1291,7 @@ class MaintenanceController extends Controller
 
     public function deleteFAR($data)
     {
-        $id = is_array($data) ? ($data['id'] ?? $data['far_no'] ?? '') : $data;
+        $id = is_array($data) ? ($data['id'] ?? $data['far_no'] ?? ($data['item_id'] ?? '')) : $data;
         FailureAnalysis::where('item_id', $id)->orWhere('id', $id)->delete();
         return ['success' => true, 'message' => 'FAR berhasil dihapus'];
     }
@@ -1063,16 +1299,19 @@ class MaintenanceController extends Controller
     // ==================== SWAB COMPONENTS ====================
     public function saveSwabComponent($data)
     {
-        $id = $data['id'] ?? $data['item_id'] ?? ('SWAB-' . time());
+        $id = $data['id'] ?? $data['item_id'] ?? ('SWAB-' . rand(100, 999));
+        $targetUnit = $data['target_unit'] ?? ($data['recipient_unit'] ?? '');
+        $pic = $data['authorized_by'] ?? ($data['pic'] ?? ($data['mechanic'] ?? 'Foreman Plant'));
+
         $fields = [
             'item_id' => $id,
             'tanggal' => $data['tanggal'] ?? date('Y-m-d'),
             'donor_unit' => $data['donor_unit'] ?? '',
-            'target_unit' => $data['target_unit'] ?? '',
+            'target_unit' => $targetUnit,
             'component_name' => $data['component_name'] ?? '',
             'reason' => $data['reason'] ?? '',
-            'authorized_by' => $data['authorized_by'] ?? '',
-            'mechanic' => $data['mechanic'] ?? '',
+            'authorized_by' => $pic,
+            'mechanic' => $data['mechanic'] ?? $pic,
             'status' => $data['status'] ?? 'Active',
             'restoration_date' => $data['restoration_date'] ?? ''
         ];
@@ -1126,4 +1365,548 @@ class MaintenanceController extends Controller
         MeetingNote::where('item_id', $id)->orWhere('id', $id)->delete();
         return ['success' => true, 'message' => 'Meeting notes berhasil dihapus'];
     }
+
+    // ==================== SCHEDULED OIL SAMPLING (SOS) ====================
+    public function saveOilSample($data)
+    {
+        $id = $data['id'] ?? $data['item_id'] ?? null;
+        $equipNo = $data['equip_no'] ?? ($data['no_unit'] ?? '');
+        $compartment = $data['compartment'] ?? 'Engine';
+        $sampleDate = $data['sample_date'] ?? now()->format('d-M-y');
+        $rating = strtoupper($data['rating'] ?? 'A');
+        
+        $fields = [
+            'sample_code' => $data['sample_code'] ?? ('LAB-' . rand(10000, 99999)),
+            'equip_no' => $equipNo,
+            'compartment' => $compartment,
+            'sample_date' => $sampleDate,
+            'hm' => floatval($data['hm'] ?? 0),
+            'oil_grade' => $data['oil_grade'] ?? '15W-40',
+            'rating' => in_array($rating, ['A', 'B', 'C', 'X', 'D']) ? $rating : 'A',
+            'top_up' => floatval($data['top_up'] ?? 0),
+            'repair_notes' => $data['repair_notes'] ?? '',
+            'si' => floatval($data['si'] ?? 0),
+            'al' => floatval($data['al'] ?? 0),
+            'na' => floatval($data['na'] ?? 0),
+            'fe' => floatval($data['fe'] ?? 0),
+            'cu' => floatval($data['cu'] ?? 0),
+            'cr' => floatval($data['cr'] ?? 0),
+            'pb' => floatval($data['pb'] ?? 0),
+            'pq' => floatval($data['pq'] ?? 0),
+            'visc_100' => floatval($data['visc_100'] ?? 0),
+            'oxi' => floatval($data['oxi'] ?? 0),
+            'soot' => floatval($data['soot'] ?? 0),
+            'tbn' => floatval($data['tbn'] ?? 0),
+            'iso_6' => floatval($data['iso_6'] ?? 0),
+            'iso_14' => floatval($data['iso_14'] ?? 0),
+            'water_pct' => floatval($data['water_pct'] ?? 0),
+            'interpretation' => $data['interpretation'] ?? 'All test results appear acceptable. Take oil samples at 250 hour intervals to monitor condition.',
+            'lab_vendor' => $data['lab_vendor'] ?? 'Caterpillar SOS Lab',
+            'status' => $data['status'] ?? 'APPROVED',
+            'created_by' => $data['created_by'] ?? 'Planner SOS'
+        ];
+
+        if (!empty($id)) {
+            $sample = OilSample::where('item_id', $id)->orWhere('id', $id)->first();
+            if ($sample) {
+                $sample->update($fields);
+                $this->logAction('Update_OilSample', "Perbarui sampel {$sample->sample_code} unit {$equipNo}", 'PLANNER');
+                return ['success' => true, 'message' => 'Data sampling oli berhasil diperbarui', 'data' => $sample];
+            }
+        }
+
+        $fields['item_id'] = 'SOS-' . strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $equipNo)) . '-' . time() . rand(10, 99);
+        $sample = OilSample::create($fields);
+        $this->logAction('Create_OilSample', "Input sampel {$sample->sample_code} kompartemen {$compartment} unit {$equipNo}", 'PLANNER');
+
+        return ['success' => true, 'message' => 'Data sampling oli baru berhasil dicatat', 'data' => $sample];
+    }
+
+    public function deleteOilSample($data)
+    {
+        $id = is_array($data) ? ($data['id'] ?? $data['item_id'] ?? '') : $data;
+        $sample = OilSample::where('item_id', $id)->orWhere('id', $id)->first();
+        if ($sample) {
+            $code = $sample->sample_code;
+            $unit = $sample->equip_no;
+            $sample->delete();
+            $this->logAction('Delete_OilSample', "Hapus sampel {$code} unit {$unit}", 'PLANNER');
+        }
+        return ['success' => true, 'message' => 'Data sampling oli berhasil dihapus'];
+    }
+
+    // =========================================================
+    // PPU — Program Pemeriksaan Undercarriage
+    // =========================================================
+
+    public function savePpuRecord($data)
+    {
+        $id      = $data['id'] ?? null;
+        $unitNo  = $data['unit_no'] ?? '';
+
+        $fields = [
+            'unit_no'                 => $unitNo,
+            'model'                   => $data['model']                   ?? null,
+            'track_group_used'        => $data['track_group_used']        ?? null,
+            'cts_date'                => $data['cts_date']                ?? null,
+            'last_fitted_track_group' => $data['last_fitted_track_group'] ?? null,
+            'pct_hours_track'         => floatval($data['pct_hours_track']         ?? 0),
+            'hours_track_gp'          => floatval($data['hours_track_gp']          ?? 0),
+            'smu'                     => floatval($data['smu']                     ?? 0),
+            // Sprocket
+            'sprocket_lh'             => floatval($data['sprocket_lh']             ?? 0),
+            'sprocket_rh'             => floatval($data['sprocket_rh']             ?? 0),
+            // Track Link — Link Height
+            'link_height_lh'          => floatval($data['link_height_lh']          ?? 0),
+            'link_height_rh'          => floatval($data['link_height_rh']          ?? 0),
+            // Track Link — Chain Bushing
+            'chain_bushing_lh'        => floatval($data['chain_bushing_lh']        ?? 0),
+            'chain_bushing_rh'        => floatval($data['chain_bushing_rh']        ?? 0),
+            // Track Link — Frame Extension
+            'frame_ext_lh'            => floatval($data['frame_ext_lh']            ?? 0),
+            'frame_ext_rh'            => floatval($data['frame_ext_rh']            ?? 0),
+            // Track Shoe — Grouser Height
+            'grouser_height_lh'       => floatval($data['grouser_height_lh']       ?? 0),
+            'grouser_height_rh'       => floatval($data['grouser_height_rh']       ?? 0),
+            // Idler Front
+            'idler_front_lh'          => floatval($data['idler_front_lh']          ?? 0),
+            'idler_front_rh'          => floatval($data['idler_front_rh']          ?? 0),
+            // Idler Rear
+            'idler_rear_lh'           => floatval($data['idler_rear_lh']           ?? 0),
+            'idler_rear_rh'           => floatval($data['idler_rear_rh']           ?? 0),
+            // Metadata
+            'inspection_date'         => $data['inspection_date']         ?? null,
+            'inspector'               => $data['inspector']               ?? null,
+            'notes'                   => $data['notes']                   ?? null,
+            'status'                  => $data['status']                  ?? 'NORMAL',
+            'created_by'              => $data['created_by']              ?? 'Planner',
+        ];
+
+        if (!empty($id)) {
+            $record = PpuRecord::find($id);
+            if ($record) {
+                $record->update($fields);
+                $this->logAction('Update_PPU', "Perbarui PPU unit {$unitNo}", 'PLANNER');
+                return ['success' => true, 'message' => 'Data PPU berhasil diperbarui', 'data' => $record];
+            }
+        }
+
+        $record = PpuRecord::create($fields);
+        $this->logAction('Create_PPU', "Input PPU unit {$unitNo} tanggal " . ($fields['inspection_date'] ?? '-'), 'PLANNER');
+
+        return ['success' => true, 'message' => 'Data PPU baru berhasil dicatat', 'data' => $record];
+    }
+
+    public function deletePpuRecord($data)
+    {
+        $id = is_array($data) ? ($data['id'] ?? '') : $data;
+        $record = PpuRecord::find($id);
+        if ($record) {
+            $unit = $record->unit_no;
+            $record->delete();
+            $this->logAction('Delete_PPU', "Hapus PPU unit {$unit} id {$id}", 'PLANNER');
+        }
+        return ['success' => true, 'message' => 'Data PPU berhasil dihapus'];
+    }
+
+    // ==================== TARGET JAM OPERASI (PLAN ALAT) ====================
+
+    public function getTargetJamOperasi($data)
+    {
+        $year  = intval($data['plan_year'] ?? date('Y'));
+        $month = intval($data['plan_month'] ?? date('n'));
+
+        // Auto-sync: Daftarkan unit dari MasterEquip yang belum ada di TargetJamOperasi pada periode ini
+        $existingNos = TargetJamOperasi::where('plan_year', $year)
+                        ->where('plan_month', $month)
+                        ->pluck('equip_no')
+                        ->map(fn($x) => strtoupper(trim($x)))
+                        ->toArray();
+
+        $allEquips = MasterEquip::all();
+        $monthName = date('M-y', strtotime("{$year}-{$month}-01"));
+
+        foreach ($allEquips as $eq) {
+            $no = strtoupper(trim($eq->equip_no ?? $eq->no_unit ?? ''));
+            if (empty($no) || in_array($no, $existingNos)) continue;
+
+            $lastHm = floatval($eq->last_hm ?? 0);
+            $due1 = ceil(($lastHm + 1) / 250) * 250;
+            $due2 = $due1 + 250;
+
+            $calcType = function($due) {
+                if ($due % 4000 === 0) return '4000';
+                if ($due % 2000 === 0) return '2000';
+                if ($due % 1000 === 0) return '1000';
+                if ($due % 500 === 0) return '500';
+                return '250';
+            };
+
+            $type1 = $calcType($due1);
+            $type2 = $calcType($due2);
+
+            TargetJamOperasi::create([
+                'equip_no'                 => $no,
+                'section'                  => $eq->section ?? ($eq->unit_type ?? 'MINING'),
+                'model'                    => $eq->model ?? '',
+                'est_hm'                   => $lastHm,
+                'est_hm_date'              => "01-{$monthName}",
+                'status'                   => strtoupper($eq->status ?? 'RFU'),
+                'next_service_hours_due'   => $due1,
+                'next_service_hours_due_2' => $due2,
+                'next_service_type'        => $type1,
+                'next_service_type_2'      => $type2,
+                'pm_250'                   => $type1 === '250' ? 1 : 0,
+                'pm_500'                   => $type1 === '500' ? 1 : 0,
+                'pm_1000'                  => $type1 === '1000' ? 1 : 0,
+                'pm_2000'                  => $type1 === '2000' ? 1 : 0,
+                'pm_4000'                  => $type1 === '4000' ? 1 : 0,
+                'downtime_pm'              => 0,
+                'downtime_backlog'         => 0,
+                'downtime_midlife'         => 0,
+                'downtime_pcr'             => 0,
+                'plan_year'                => $year,
+                'plan_month'               => $month,
+            ]);
+            $existingNos[] = $no;
+        }
+
+        $rows   = TargetJamOperasi::where('plan_year', $year)
+                    ->where('plan_month', $month)
+                    ->orderBy('section')
+                    ->orderBy('equip_no')
+                    ->get()
+                    ->toArray();
+
+        $harian = TargetJamHarian::where('plan_year', $year)
+                    ->where('plan_month', $month)
+                    ->get()
+                    ->toArray();
+
+        return [
+            'success'           => true,
+            'targetJamOperasi'  => $rows,
+            'targetJamHarian'   => $harian,
+        ];
+    }
+
+    public function savePlanAlatRow($data)
+    {
+        $equipNo = $data['equip_no'] ?? '';
+        if (empty($equipNo)) {
+            return ['success' => false, 'message' => 'equip_no wajib diisi'];
+        }
+
+        $year  = intval($data['plan_year'] ?? date('Y'));
+        $month = intval($data['plan_month'] ?? date('n'));
+
+        $fields = [
+            'equip_no'                 => strtoupper(trim($equipNo)),
+            'section'                  => $data['section']                  ?? 'MINING',
+            'model'                    => $data['model']                    ?? '',
+            'est_hm'                   => floatval($data['est_hm']          ?? 0),
+            'est_hm_date'              => $data['est_hm_date']              ?? '01-Jun-24',
+            'status'                   => strtoupper($data['status']        ?? 'RFU'),
+            'next_service_hours_due'   => floatval($data['next_service_hours_due'] ?? 0),
+            'next_service_hours_due_2' => floatval($data['next_service_hours_due_2'] ?? 0),
+            'next_service_type_hm'     => floatval($data['next_service_type_hm']   ?? 250),
+            'next_service_type'        => $data['next_service_type']        ?? 'PS-250',
+            'next_service_type_2'      => $data['next_service_type_2']      ?? 'PS-250',
+            'next_service_date'        => $data['next_service_date']        ?? null,
+            'next_service_date_2'      => $data['next_service_date_2']      ?? null,
+            'pm_250'                   => intval($data['pm_250']            ?? 0),
+            'pm_500'                   => intval($data['pm_500']            ?? 0),
+            'pm_1000'                  => intval($data['pm_1000']           ?? 0),
+            'pm_2000'                  => intval($data['pm_2000']           ?? 0),
+            'pm_4000'                  => intval($data['pm_4000']           ?? 0),
+            'pm_other'                 => intval($data['pm_other']          ?? 0),
+            'downtime_pm'              => floatval($data['downtime_pm']     ?? 0),
+            'downtime_backlog'         => floatval($data['downtime_backlog']?? 0),
+            'downtime_midlife'         => floatval($data['downtime_midlife']?? 0),
+            'downtime_pcr'             => floatval($data['downtime_pcr']    ?? 0),
+            'plan_year'                => $year,
+            'plan_month'               => $month,
+        ];
+
+        $row = TargetJamOperasi::updateOrCreate(
+            ['equip_no' => $fields['equip_no'], 'plan_year' => $year, 'plan_month' => $month],
+            $fields
+        );
+
+        $this->logAction('SavePlanAlat', "Simpan plan alat {$equipNo} bulan {$month}/{$year}", 'PLANNER');
+        return ['success' => true, 'message' => "Plan alat {$equipNo} berhasil disimpan", 'data' => $row];
+    }
+
+    public function deletePlanAlatRow($data)
+    {
+        $id = is_array($data) ? ($data['id'] ?? '') : $data;
+        $row = TargetJamOperasi::find($id);
+        if ($row) {
+            $equipNo = $row->equip_no;
+            $year    = $row->plan_year;
+            $month   = $row->plan_month;
+            $row->delete();
+            // Hapus juga jam harian untuk unit ini di bulan yang sama
+            TargetJamHarian::where('equip_no', $equipNo)
+                ->where('plan_year', $year)
+                ->where('plan_month', $month)
+                ->delete();
+            $this->logAction('DeletePlanAlat', "Hapus plan alat {$equipNo} id {$id}", 'PLANNER');
+        }
+        return ['success' => true, 'message' => 'Data plan alat berhasil dihapus'];
+    }
+
+    public function saveJamHarian($data)
+    {
+        $equipNo = strtoupper(trim($data['equip_no'] ?? ''));
+        if (empty($equipNo)) {
+            return ['success' => false, 'message' => 'equip_no wajib diisi'];
+        }
+
+        $year  = intval($data['plan_year']  ?? date('Y'));
+        $month = intval($data['plan_month'] ?? date('n'));
+        $day   = intval($data['plan_day']   ?? 1);
+        $jam   = floatval($data['jam_rencana'] ?? 0);
+
+        $record = TargetJamHarian::updateOrCreate(
+            ['equip_no' => $equipNo, 'plan_year' => $year, 'plan_month' => $month, 'plan_day' => $day],
+            ['jam_rencana' => $jam, 'downtime_type' => ($jam == 24 ? 'BD' : 'PM')]
+        );
+
+        // Sync total jam PM ke tabel TargetJamOperasi
+        $totalPmHours = TargetJamHarian::where('equip_no', $equipNo)
+            ->where('plan_year', $year)
+            ->where('plan_month', $month)
+            ->where('jam_rencana', '<', 24)
+            ->sum('jam_rencana');
+
+        TargetJamOperasi::where('equip_no', $equipNo)
+            ->where('plan_year', $year)
+            ->where('plan_month', $month)
+            ->update(['downtime_pm' => $totalPmHours]);
+
+        return ['success' => true, 'message' => "Jam harian hari {$day} disimpan", 'data' => $record];
+    }
+
+    public function deleteJamHarian($data)
+    {
+        $id = is_array($data) ? ($data['id'] ?? '') : $data;
+        $rec = TargetJamHarian::find($id);
+        if ($rec) {
+            $equipNo = $rec->equip_no;
+            $year    = $rec->plan_year;
+            $month   = $rec->plan_month;
+            $rec->delete();
+
+            $totalPmHours = TargetJamHarian::where('equip_no', $equipNo)
+                ->where('plan_year', $year)
+                ->where('plan_month', $month)
+                ->where('jam_rencana', '<', 24)
+                ->sum('jam_rencana');
+
+            TargetJamOperasi::where('equip_no', $equipNo)
+                ->where('plan_year', $year)
+                ->where('plan_month', $month)
+                ->update(['downtime_pm' => $totalPmHours]);
+        }
+        return ['success' => true, 'message' => 'Jam harian berhasil dihapus'];
+    }
+
+    public function bulkSaveJamHarian($data)
+    {
+        $equipNo = strtoupper(trim($data['equip_no'] ?? ''));
+        $year    = intval($data['plan_year']  ?? date('Y'));
+        $month   = intval($data['plan_month'] ?? date('n'));
+        $days    = $data['days'] ?? []; // [{day: 1, jam: 24}, ...]
+
+        if (empty($equipNo) || empty($days)) {
+            return ['success' => false, 'message' => 'equip_no dan days wajib diisi'];
+        }
+
+        foreach ($days as $d) {
+            $day = intval($d['day'] ?? $d['plan_day'] ?? 0);
+            $jam = floatval($d['jam'] ?? $d['jam_rencana'] ?? 0);
+            if ($day < 1 || $day > 31) continue;
+            TargetJamHarian::updateOrCreate(
+                ['equip_no' => $equipNo, 'plan_year' => $year, 'plan_month' => $month, 'plan_day' => $day],
+                ['jam_rencana' => $jam, 'downtime_type' => ($jam == 24 ? 'BD' : 'PM')]
+            );
+        }
+
+        // Sync total jam PM ke tabel TargetJamOperasi
+        $totalPmHours = TargetJamHarian::where('equip_no', $equipNo)
+            ->where('plan_year', $year)
+            ->where('plan_month', $month)
+            ->where('jam_rencana', '<', 24)
+            ->sum('jam_rencana');
+
+        TargetJamOperasi::where('equip_no', $equipNo)
+            ->where('plan_year', $year)
+            ->where('plan_month', $month)
+            ->update(['downtime_pm' => $totalPmHours]);
+
+        return ['success' => true, 'message' => "Jam harian bulk untuk {$equipNo} berhasil disimpan"];
+    }
+
+    public function seedDemoTargetJam($data)
+    {
+        $year = intval($data['plan_year'] ?? 2024);
+        $month = intval($data['plan_month'] ?? 6);
+
+        $units = [
+            [
+                'section' => 'MINING', 'equip_no' => 'DZ 201', 'model' => 'D85ESS-2', 'est_hm' => 18787, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 19000, 'next_service_hours_due_2' => 19250,
+                'next_service_type' => '1000', 'next_service_type_2' => '250',
+                'next_service_date' => '2024-06-18', 'next_service_date_2' => '2024-07-09',
+                'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 6, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [17 => 24, 18 => 24]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'DZ 222', 'model' => 'D85ESS-2', 'est_hm' => 21096, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 21250, 'next_service_hours_due_2' => 21500,
+                'next_service_type' => '250', 'next_service_type_2' => '500',
+                'next_service_date' => '2024-06-13', 'next_service_date_2' => '2024-07-04',
+                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 5, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [13 => 5]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'DZ 273', 'model' => 'D85ESS-2', 'est_hm' => 15900, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 16000, 'next_service_hours_due_2' => 16250,
+                'next_service_type' => '4000', 'next_service_type_2' => '250',
+                'next_service_date' => '2024-06-09', 'next_service_date_2' => '2024-06-30',
+                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 1,
+                'downtime_pm' => 17, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [10 => 12, 29 => 24, 30 => 24]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'DZ 281', 'model' => 'D85ESS-2', 'est_hm' => 17707, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 17750, 'next_service_hours_due_2' => 18000,
+                'next_service_type' => '250', 'next_service_type_2' => '2000',
+                'next_service_date' => '2024-06-04', 'next_service_date_2' => '2024-06-25',
+                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 1, 'pm_4000' => 0,
+                'downtime_pm' => 13, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [5 => 5, 26 => 24, 27 => 24, 28 => 24]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'DZ 294', 'model' => 'D85ESS-2', 'est_hm' => 18239, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 18250, 'next_service_hours_due_2' => 18500,
+                'next_service_type' => '250', 'next_service_type_2' => '500',
+                'next_service_date' => '2024-06-01', 'next_service_date_2' => '2024-06-22',
+                'pm_250' => 1, 'pm_500' => 1, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 5, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [2 => 24, 3 => 24, 4 => 24, 5 => 24, 6 => 24, 7 => 24, 8 => 24, 9 => 24, 10 => 24, 11 => 24, 12 => 24, 13 => 24, 14 => 24, 15 => 24, 16 => 24, 17 => 24, 18 => 24, 22 => 5]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'DZ 331', 'model' => 'D85ESS-2', 'est_hm' => 12836, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 13000, 'next_service_hours_due_2' => 13250,
+                'next_service_type' => '1000', 'next_service_type_2' => '250',
+                'next_service_date' => '2024-06-14', 'next_service_date_2' => '2024-07-05',
+                'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 6, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [15 => 24, 16 => 24]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'DZ 365', 'model' => 'D85ESS-2', 'est_hm' => 18904, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 19000, 'next_service_hours_due_2' => 19250,
+                'next_service_type' => '1000', 'next_service_type_2' => '250',
+                'next_service_date' => '2024-06-08', 'next_service_date_2' => '2024-06-29',
+                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 11, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [7 => 6, 30 => 5]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'DZ 373', 'model' => 'D65P-12', 'est_hm' => 4702, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 4750, 'next_service_hours_due_2' => 5000,
+                'next_service_type' => '250', 'next_service_type_2' => '1000',
+                'next_service_date' => '2024-06-05', 'next_service_date_2' => '2024-06-25',
+                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 9, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [5 => 24, 6 => 24, 25 => 6]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'DZ 393', 'model' => 'D65P-12', 'est_hm' => 1752, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 2000, 'next_service_hours_due_2' => 2250,
+                'next_service_type' => '2000', 'next_service_type_2' => '250',
+                'next_service_date' => '2024-06-21', 'next_service_date_2' => '2024-07-12',
+                'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 1, 'pm_4000' => 0,
+                'downtime_pm' => 8, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [19 => 24, 20 => 24, 21 => 24]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'DZ 422', 'model' => 'D65P-12', 'est_hm' => 774, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 1000, 'next_service_hours_due_2' => 1250,
+                'next_service_type' => '1000', 'next_service_type_2' => '250',
+                'next_service_date' => '2024-06-19', 'next_service_date_2' => '2024-07-10',
+                'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 6, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [18 => 6]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'MG 081', 'model' => 'GD535', 'est_hm' => 12984, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 13000, 'next_service_hours_due_2' => 13250,
+                'next_service_type' => '1000', 'next_service_type_2' => '250',
+                'next_service_date' => '2024-06-02', 'next_service_date_2' => '2024-06-23',
+                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 9, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [2 => 24, 3 => 24, 22 => 3]
+            ],
+            [
+                'section' => 'HAULING', 'equip_no' => 'MG 123', 'model' => 'GD535', 'est_hm' => 17493, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 17500, 'next_service_hours_due_2' => 17750,
+                'next_service_type' => '500', 'next_service_type_2' => '250',
+                'next_service_date' => '2024-06-01', 'next_service_date_2' => '2024-06-22',
+                'pm_250' => 0, 'pm_500' => 1, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 3, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [21 => 24, 22 => 24]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'MG 212', 'model' => 'GD535', 'est_hm' => 995, 'est_hm_date' => '01-Jun-24', 'status' => 'RFU',
+                'next_service_hours_due' => 1000, 'next_service_hours_due_2' => 1250,
+                'next_service_type' => '1000', 'next_service_type_2' => '250',
+                'next_service_date' => '2024-06-01', 'next_service_date_2' => '2024-06-22',
+                'pm_250' => 1, 'pm_500' => 0, 'pm_1000' => 1, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 3, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => [22 => 3]
+            ],
+            [
+                'section' => 'MINING', 'equip_no' => 'VB 124', 'model' => 'BW211D-40', 'est_hm' => 8388, 'est_hm_date' => '01-Jun-24', 'status' => 'BD',
+                'next_service_hours_due' => 8500, 'next_service_hours_due_2' => 8750,
+                'next_service_type' => '500', 'next_service_type_2' => '250',
+                'next_service_date' => null, 'next_service_date_2' => null,
+                'pm_250' => 0, 'pm_500' => 0, 'pm_1000' => 0, 'pm_2000' => 0, 'pm_4000' => 0,
+                'downtime_pm' => 0, 'downtime_backlog' => 0, 'downtime_midlife' => 0, 'downtime_pcr' => 0,
+                'daily' => array_fill_keys(range(1, 30), 24)
+            ]
+        ];
+
+        foreach ($units as $u) {
+            $daily = $u['daily'] ?? [];
+            unset($u['daily']);
+            $u['plan_year'] = $year;
+            $u['plan_month'] = $month;
+
+            TargetJamOperasi::updateOrCreate(
+                ['equip_no' => $u['equip_no'], 'plan_year' => $year, 'plan_month' => $month],
+                $u
+            );
+
+            foreach ($daily as $day => $jam) {
+                TargetJamHarian::updateOrCreate(
+                    ['equip_no' => $u['equip_no'], 'plan_year' => $year, 'plan_month' => $month, 'plan_day' => $day],
+                    ['jam_rencana' => $jam, 'downtime_type' => ($jam == 24 ? 'BD' : 'PM')]
+                );
+            }
+        }
+
+        $this->logAction('SeedDemoTargetJam', "Memuat 14 data riil screenshot Juni 2024", 'PLANNER');
+        return [
+            'success' => true,
+            'message' => 'Data Schedule Service & Downtime Gantt Juni 2024 berhasil dimuat (14 Unit)',
+            'data'    => $this->getTargetJamOperasi(['plan_year' => $year, 'plan_month' => $month])
+        ];
+    }
 }
+

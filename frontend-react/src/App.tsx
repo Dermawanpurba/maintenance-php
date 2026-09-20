@@ -16,7 +16,7 @@ import { FailureAnalysisView } from './components/FailureAnalysisView';
 import { MeetingNotesView } from './components/MeetingNotesView';
 import { MonthlyBudgetView } from './components/MonthlyBudgetView';
 import { PcrView } from './components/PcrView';
-import { PreventiveMaintenanceView } from './components/PreventiveMaintenanceView';
+import { BasicMaintenanceView } from './components/BasicMaintenanceView';
 import { SystemHealthView } from './components/SystemHealthView';
 import { MobileLiquidDock } from './components/MobileLiquidDock';
 import { Database3dView } from './components/Database3dView';
@@ -24,6 +24,9 @@ import { ManageUsersView } from './components/ManageUsersView';
 import { MasterCrewCompView } from './components/MasterCrewCompView';
 import { QuickBDAwalModal } from './components/QuickBDAwalModal';
 import { SettingsView } from './components/SettingsView';
+import { ScheduledOilSamplingView } from './components/ScheduledOilSamplingView';
+import { PpuView } from './components/PpuView';
+import { TargetJamOperasiView } from './components/TargetJamOperasiView';
 import { printExecutiveReport } from './utils/printUtils';
 import { api } from './services/api';
 import {
@@ -45,7 +48,12 @@ import {
   SystemLogItem,
   MasterPelapor,
   MasterComponentItem,
-  SettingsData
+  SettingsData,
+  OilSample,
+  MaintenanceWeek,
+  PpuRecord,
+  TargetJamOperasi,
+  TargetJamHarian
 } from './types';
 import { RefreshCw } from 'lucide-react';
 
@@ -77,6 +85,12 @@ export const App: React.FC = () => {
   const [pelapors, setPelapors] = useState<MasterPelapor[]>([]);
   const [components, setComponents] = useState<MasterComponentItem[]>([]);
   const [settings, setSettings] = useState<SettingsData>({});
+  const [oilSamples, setOilSamples] = useState<OilSample[]>([]);
+  const [pmRecords, setPmRecords] = useState<any[]>([]);
+  const [maintenanceWeeks, setMaintenanceWeeks] = useState<MaintenanceWeek[]>([]);
+  const [targetJamOperasi, setTargetJamOperasi] = useState<TargetJamOperasi[]>([]);
+  const [targetJamHarian, setTargetJamHarian] = useState<TargetJamHarian[]>([]);
+  const [inspections, setInspections] = useState<any[]>([]);
   const [isBDAwalModalOpen, setIsBDAwalModalOpen] = useState(false);
 
   const loadData = async () => {
@@ -108,6 +122,12 @@ export const App: React.FC = () => {
         setPelapors(data.pelaporList || []);
         setComponents(data.components || []);
         setSettings(data.settings || {});
+        setOilSamples(data.oilSamples || []);
+        setPmRecords(data.pmRecords || []);
+        setMaintenanceWeeks(data.maintenanceWeeks || []);
+        setTargetJamOperasi(data.targetJamOperasi || []);
+        setTargetJamHarian(data.targetJamHarian || []);
+        setInspections(data.inspections || []);
       }
     } catch (err) {
       console.error('Failed to fetch data from API:', err);
@@ -191,7 +211,6 @@ export const App: React.FC = () => {
           latency={latency}
           onRefresh={loadData}
           refreshing={refreshing}
-          onBackup={handleBackup}
           onOpenBDAwal={() => setIsBDAwalModalOpen(true)}
           onPrintExecSummary={handlePrintExecReport}
         />
@@ -248,11 +267,39 @@ export const App: React.FC = () => {
                 {currentTab === 'pcr' && (
                   <PcrView pcrList={pcrList} equipments={equipments} onRefresh={loadData} />
                 )}
-                {['pm_washing', 'pm_greasing', 'pm_inspection', 'pm_torque', 'pm_battery'].includes(currentTab) && (
-                  <PreventiveMaintenanceView
+                {currentTab === 'sos' && (
+                  <ScheduledOilSamplingView
+                    equipments={equipments}
+                    oilSamples={oilSamples}
+                    onRefresh={loadData}
+                    onNavigateToWO={(unit, problem) => {
+                      setCurrentTab('wo');
+                    }}
+                  />
+                )}
+                {[
+                  'bm_dashboard',
+                  'bm_inspection',
+                  'bm_greasing',
+                  'bm_washing',
+                  'bm_ac_electrical',
+                  'bm_bucket_blade',
+                  'bm_undercarriage',
+                  'bm_retorque',
+                  'bm_tyre',
+                  'pm_washing',
+                  'pm_greasing',
+                  'pm_inspection',
+                  'pm_torque',
+                  'pm_battery'
+                ].includes(currentTab) && (
+                  <BasicMaintenanceView
                     category={currentTab as any}
                     equipments={equipments}
+                    pmRecords={pmRecords}
+                    maintenanceWeeks={maintenanceWeeks}
                     onRefresh={loadData}
+                    onNavigate={tab => setCurrentTab(tab as any)}
                   />
                 )}
                 {currentTab === 'fleet' && (
@@ -261,6 +308,7 @@ export const App: React.FC = () => {
                     planAlats={planAlats}
                     planServices={planServices}
                     onRefresh={loadData}
+                    onNavigate={tab => setCurrentTab(tab as any)}
                   />
                 )}
                 {currentTab === 'wo' && (
@@ -293,7 +341,7 @@ export const App: React.FC = () => {
                   />
                 )}
                 {currentTab === 'p2h' && (
-                  <P2hInspectionView equipments={equipments} onRefresh={loadData} />
+                  <P2hInspectionView equipments={equipments} inspections={inspections} onRefresh={loadData} />
                 )}
                 {currentTab === 'parts' && (
                   <PartsStockView parts={parts} onRefresh={loadData} />
@@ -314,6 +362,17 @@ export const App: React.FC = () => {
                 )}
                 {currentTab === 'far' && (
                   <FailureAnalysisView fars={fars} equipments={equipments} onRefresh={loadData} />
+                )}
+                {currentTab === 'ppu' && (
+                  <PpuView equipments={equipments} onRefresh={loadData} />
+                )}
+                {currentTab === 'target_jam_operasi' && (
+                  <TargetJamOperasiView
+                    equipments={equipments}
+                    targetJamOperasi={targetJamOperasi}
+                    targetJamHarian={targetJamHarian}
+                    onRefresh={loadData}
+                  />
                 )}
                 {currentTab === 'meetings' && (
                   <MeetingNotesView notes={meetingNotes} onRefresh={loadData} />

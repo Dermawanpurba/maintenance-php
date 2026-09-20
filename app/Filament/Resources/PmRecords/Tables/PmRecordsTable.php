@@ -28,6 +28,11 @@ class PmRecordsTable
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('week_no')
+                    ->searchable(),
+                TextColumn::make('achievement_pct')
+                    ->numeric()
+                    ->sortable(),
             ])
             ->filters([
                 //

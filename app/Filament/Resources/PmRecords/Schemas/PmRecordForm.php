@@ -38,6 +38,13 @@ class PmRecordForm
                     ->default(0),
                 Textarea::make('status')
                     ->columnSpanFull(),
+                TextInput::make('week_no')
+                    ->default('WEEK 40'),
+                TextInput::make('achievement_pct')
+                    ->numeric()
+                    ->default(100),
+                Textarea::make('checklist_json')
+                    ->columnSpanFull(),
             ]);
     }
 }

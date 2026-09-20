@@ -23,6 +23,9 @@ Route::match(['get', 'post', 'options'], '/', function (Request $request) {
     if (file_exists($indexPath)) {
         return response()->file($indexPath, [
             'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0'
         ]);
     }
     return response('Frontend tidak ditemukan di folder public.', 404);
@@ -45,7 +48,10 @@ Route::match(['get', 'post', 'options'], '/{any?}', function (Request $request) 
     if (file_exists($indexPath)) {
         return response()->file($indexPath, [
             'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0'
         ]);
     }
     return response('Frontend tidak ditemukan di folder public.', 404);
-})->where('any', '.*');
+})->where('any', '^(?!admin).*$');
