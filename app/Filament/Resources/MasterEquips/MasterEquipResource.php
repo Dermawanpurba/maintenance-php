@@ -20,7 +20,19 @@ class MasterEquipResource extends Resource
 {
     protected static ?string $model = MasterEquip::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-truck';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Master & Warehouse';
+
+    protected static ?string $navigationLabel = 'Master Unit & Plan';
+
+    protected static ?string $modelLabel = 'Unit Armada';
+
+    protected static ?string $pluralModelLabel = 'Master Unit & Plan';
+
+    protected static ?int $navigationSort = 1;
+
+    protected static ?string $recordTitleAttribute = 'equip_no';
 
     public static function form(Schema $schema): Schema
     {

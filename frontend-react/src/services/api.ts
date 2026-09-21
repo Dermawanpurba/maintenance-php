@@ -310,5 +310,22 @@ export const api = {
   async seedDemoTargetJam(year: number = 2024, month: number = 6) {
     return this.postAction('seedDemoTargetJam', { plan_year: year, plan_month: month });
   },
+
+  // ==================== MASTER DATABASE PART SERVICE ====================
+  async getPartServices(params?: { equipment?: string; unit_type?: string; model?: string }) {
+    return this.postAction('getPartServices', params || {});
+  },
+
+  async savePartService(data: any) {
+    return this.postAction('savePartService', data);
+  },
+
+  async deletePartService(id: number | string) {
+    return this.postAction('deletePartService', { id });
+  },
+
+  async seedPartServices() {
+    return this.postAction('seedPartServices');
+  },
 };
 

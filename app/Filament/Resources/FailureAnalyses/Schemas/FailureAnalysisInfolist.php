@@ -10,44 +10,66 @@ class FailureAnalysisInfolist
     public static function configure(Schema $schema): Schema
     {
         return $schema
+            ->columns(3)
             ->components([
                 TextEntry::make('item_id')
-                    ->placeholder('-'),
-                TextEntry::make('tanggal')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
+                    ->label('Nomor FAR')
+                    ->weight('bold')
+                    ->color('primary')
+                    ->copyable(),
+
                 TextEntry::make('equip_no')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('component_name')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('chronology')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('five_why_json')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('fishbone_json')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('corrective_action')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('preventive_action')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
+                    ->label('Nomor Unit')
+                    ->badge()
+                    ->color('gray'),
+
                 TextEntry::make('status')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
+                    ->label('Status Analisa')
+                    ->badge()
+                    ->color(fn (string $state): string => match (strtoupper($state)) {
+                        'CLOSED'        => 'success',
+                        'OPEN'          => 'danger',
+                        'INVESTIGATING' => 'warning',
+                        default         => 'gray',
+                    }),
+
+                TextEntry::make('no_wo')
+                    ->label('Work Order Kejadian (P4.2)')
+                    ->badge()
+                    ->color('primary')
+                    ->placeholder('Tanpa tautan WO'),
+
+                TextEntry::make('component_name')
+                    ->label('Komponen Gagal')
+                    ->weight('bold'),
+
                 TextEntry::make('lead_investigator')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('created_at')
-                    ->dateTime()
+                    ->label('Lead Investigator')
                     ->placeholder('-'),
-                TextEntry::make('updated_at')
-                    ->dateTime()
+
+                TextEntry::make('tanggal')
+                    ->label('Tanggal Kejadian')
+                    ->date('d M Y')
+                    ->placeholder('-'),
+
+                TextEntry::make('created_at')
+                    ->label('Tanggal Laporan Dibuat')
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('-'),
+
+                TextEntry::make('chronology')
+                    ->label('Kronologi Insiden & Indikasi Awal')
+                    ->columnSpanFull()
+                    ->placeholder('-'),
+
+                TextEntry::make('corrective_action')
+                    ->label('Tindakan Korektif Langsung')
+                    ->columnSpanFull()
+                    ->placeholder('-'),
+
+                TextEntry::make('preventive_action')
+                    ->label('Tindakan Pencegahan (Agar Tidak Terulang)')
+                    ->columnSpanFull()
                     ->placeholder('-'),
             ]);
     }

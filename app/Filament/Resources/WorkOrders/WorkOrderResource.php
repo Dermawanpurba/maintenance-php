@@ -21,6 +21,19 @@ class WorkOrderResource extends Resource
     protected static ?string $model = WorkOrder::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|\UnitEnum|null $navigationGroup = 'Operational & Work Order';
+    protected static ?int $navigationSort = 1;
+
+    public static function getNavigationBadge(): ?string
+    {
+        $open = WorkOrder::whereNotIn('status', ['CLOSED', 'CANCEL'])->count();
+        return $open > 0 ? (string) $open : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
 
     public static function form(Schema $schema): Schema
     {

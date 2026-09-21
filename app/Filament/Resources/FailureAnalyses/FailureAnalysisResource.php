@@ -13,14 +13,16 @@ use App\Models\FailureAnalysis;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
 class FailureAnalysisResource extends Resource
 {
     protected static ?string $model = FailureAnalysis::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-magnifying-glass-circle';
+    protected static string|\UnitEnum|null $navigationGroup = 'Condition Monitoring';
+    protected static ?string $navigationLabel = 'Failure Analysis (RCA)';
+    protected static ?int $navigationSort = 5;
 
     public static function form(Schema $schema): Schema
     {
@@ -39,18 +41,16 @@ class FailureAnalysisResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => ListFailureAnalyses::route('/'),
+            'index'  => ListFailureAnalyses::route('/'),
             'create' => CreateFailureAnalysis::route('/create'),
-            'view' => ViewFailureAnalysis::route('/{record}'),
-            'edit' => EditFailureAnalysis::route('/{record}/edit'),
+            'view'   => ViewFailureAnalysis::route('/{record}'),
+            'edit'   => EditFailureAnalysis::route('/{record}/edit'),
         ];
     }
 }

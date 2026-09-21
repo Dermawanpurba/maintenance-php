@@ -20,7 +20,19 @@ class TargetJamOperasiResource extends Resource
 {
     protected static ?string $model = TargetJamOperasi::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-calendar-days';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Planning & Coordination';
+
+    protected static ?string $navigationLabel = 'Target Jam Operasi';
+
+    protected static ?string $modelLabel = 'Target Jam Operasi';
+
+    protected static ?string $pluralModelLabel = 'Target Jam Operasi';
+
+    protected static ?int $navigationSort = 2;
+
+    protected static ?string $recordTitleAttribute = 'equip_no';
 
     public static function form(Schema $schema): Schema
     {

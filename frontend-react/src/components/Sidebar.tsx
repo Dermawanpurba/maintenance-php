@@ -34,7 +34,8 @@ import {
   Layers,
   Disc,
   Activity,
-  CalendarDays
+  CalendarDays,
+  FolderKanban
 } from 'lucide-react';
 
 export type NavTab =
@@ -68,10 +69,16 @@ export type NavTab =
   | 'monthly_budget'
   | 'meetings'
   | 'target_jam_operasi'
+  | 'planning_part_service'
   | 'fleet'
   | 'parts'
   | 'tools'
   | 'master_crew'
+  | 'master_part_service'
+  | 'ps_dt'
+  | 'ps_exca'
+  | 'ps_dozer'
+  | 'ps_greder'
   | 'manage_users'
   | 'settings'
   | 'system';
@@ -124,6 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     daily: false,
     plan: true,
     master: false,
+    master_ps: true,
     admin: false
   });
 
@@ -205,6 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'monthly_budget', label: 'Budget & Realization', icon: Wallet, iconColor: 'text-emerald-300' },
         { id: 'target_jam_operasi', label: 'Target Jam Operasi', icon: CalendarDays, iconColor: 'text-blue-400' },
+        { id: 'planning_part_service', label: 'Planning Part Service', icon: ClipboardList, iconColor: 'text-cyan-400' },
         { id: 'meetings', label: 'Notulen Rapat Plant', icon: FileText, iconColor: 'text-yellow-300' }
       ]
     },
@@ -216,6 +225,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'fleet', label: 'Master Unit & Plan', icon: Truck, iconColor: 'text-indigo-400', count: counts.equip },
         { id: 'parts', label: 'Master Parts & Stock', icon: Package, iconColor: 'text-amber-400', count: counts.parts },
+        { id: 'master_part_service', label: 'Master Part Service (Folder)', icon: FolderKanban, iconColor: 'text-amber-400' },
         { id: 'tools', label: 'Master Tools & Workshop', icon: Hammer, iconColor: 'text-orange-400' },
         { id: 'master_crew', label: 'Master Crew & Komponen', icon: Users, iconColor: 'text-teal-400' }
       ]

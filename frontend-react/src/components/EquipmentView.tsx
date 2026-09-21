@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Truck, Plus, Search, Filter, CheckCircle2, AlertTriangle, ShieldCheck, X, Trash2, Edit, Calendar, Clock, Gauge } from 'lucide-react';
+import { Truck, Plus, Search, Filter, CheckCircle2, AlertTriangle, ShieldCheck, X, Trash2, Edit, Calendar, Clock, Gauge, ArrowUpRight } from 'lucide-react';
 import { Equipment, PlanAlat, PlanService } from '../types';
 import { api } from '../services/api';
 
@@ -7,7 +7,8 @@ interface EquipmentViewProps {
   equipments: Equipment[];
   planAlats?: PlanAlat[];
   planServices?: PlanService[];
-  onNavigate?: (tab: string) => void;
+  onNavigate?: (tab: string, equipNo?: string) => void;
+  onNavigateToPlanning?: (equipNo: string) => void;
   onRefresh: () => void;
 }
 
@@ -18,6 +19,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
   planAlats = [],
   planServices = [],
   onNavigate,
+  onNavigateToPlanning,
   onRefresh,
 }) => {
   const [activeTab, setActiveTab] = useState<EquipTab>('armada');
@@ -280,9 +282,18 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                       return (
                         <tr key={eq.id || idx} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-3 px-4">
-                            <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-900 font-black text-xs font-mono">
-                              {eq.no_unit}
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onNavigateToPlanning) onNavigateToPlanning(eq.no_unit);
+                                else if (onNavigate) onNavigate('planning_part_service', eq.no_unit);
+                              }}
+                              className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-600 border border-slate-200 hover:border-blue-600 text-slate-900 hover:text-white font-black text-xs font-mono transition-all shadow-sm cursor-pointer"
+                              title={`Klik untuk melihat Alokasi Unit Terjadwal pada Planning Part Service (${eq.no_unit})`}
+                            >
+                              <span>{eq.no_unit}</span>
+                              <ArrowUpRight className="w-3 h-3 text-slate-400 group-hover:text-white transition-colors" />
+                            </button>
                           </td>
                           <td className="py-3 px-4">
                             <div className="font-bold text-slate-800">{eq.model || '-'}</div>
@@ -387,7 +398,20 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                   ) : (
                     planServices.map((ps, idx) => (
                       <tr key={ps.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-slate-900">{ps.equip_no}</td>
+                        <td className="py-3 px-4">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onNavigateToPlanning) onNavigateToPlanning(ps.equip_no);
+                              else if (onNavigate) onNavigate('planning_part_service', ps.equip_no);
+                            }}
+                            className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-600 border border-blue-200 hover:border-blue-600 text-blue-700 hover:text-white font-mono font-bold text-xs transition-all shadow-sm cursor-pointer"
+                            title={`Klik untuk melihat Alokasi Unit Terjadwal pada Planning Part Service (${ps.equip_no})`}
+                          >
+                            <span>{ps.equip_no}</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 text-blue-500 group-hover:text-white transition-colors" />
+                          </button>
+                        </td>
                         <td className="py-3 px-4 font-semibold text-slate-700">{ps.model || '-'}</td>
                         <td className="py-3 px-4">
                           <span className="px-2.5 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300 font-black text-[10px]">

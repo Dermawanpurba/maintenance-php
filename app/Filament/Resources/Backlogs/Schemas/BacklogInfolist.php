@@ -10,32 +10,72 @@ class BacklogInfolist
     public static function configure(Schema $schema): Schema
     {
         return $schema
+            ->columns(3)
             ->components([
                 TextEntry::make('item_id')
-                    ->placeholder('-'),
-                TextEntry::make('tanggal')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
+                    ->label('ID Backlog')
+                    ->weight('bold')
+                    ->color('primary')
+                    ->copyable(),
+
                 TextEntry::make('equip_no')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('deskripsi_backlog')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
+                    ->label('Nomor Unit')
+                    ->badge()
+                    ->color('gray'),
+
                 TextEntry::make('status')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('rencana_eksekusi')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
+                    ->label('Status')
+                    ->badge()
+                    ->color(fn (string $state): string => match (strtoupper($state)) {
+                        'CLOSED'                    => 'success',
+                        'OPEN'                      => 'danger',
+                        'IN PROGRESS', 'PROGRESS'   => 'warning',
+                        default                     => 'gray',
+                    }),
+
+                TextEntry::make('priority')
+                    ->label('Prioritas')
+                    ->badge()
+                    ->color(fn (?string $state): string => match (strtoupper($state ?? 'MEDIUM')) {
+                        'HIGH', 'CRITICAL' => 'danger',
+                        'MEDIUM'           => 'warning',
+                        default            => 'info',
+                    }),
+
+                TextEntry::make('no_wo')
+                    ->label('Work Order Tertaut (P4.1)')
+                    ->badge()
+                    ->color('primary')
+                    ->placeholder('Belum ada WO yang diterbitkan'),
+
                 TextEntry::make('est_hours')
-                    ->numeric()
+                    ->label('Estimasi Jam Kerja')
+                    ->suffix(' Jam')
+                    ->numeric(),
+
+                TextEntry::make('tanggal')
+                    ->label('Tanggal Temuan')
+                    ->date('d M Y')
                     ->placeholder('-'),
+
+                TextEntry::make('closed_at')
+                    ->label('Tanggal Selesai / Ditutup')
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('Masih berstatus OPEN / IN PROGRESS'),
+
                 TextEntry::make('created_at')
-                    ->dateTime()
+                    ->label('Waktu Dicatat')
+                    ->dateTime('d M Y H:i')
                     ->placeholder('-'),
-                TextEntry::make('updated_at')
-                    ->dateTime()
+
+                TextEntry::make('deskripsi_backlog')
+                    ->label('Deskripsi Temuan Kerusakan')
+                    ->columnSpanFull()
+                    ->placeholder('-'),
+
+                TextEntry::make('rencana_eksekusi')
+                    ->label('Rencana Tindakan & Kebutuhan Suku Cadang')
+                    ->columnSpanFull()
                     ->placeholder('-'),
             ]);
     }

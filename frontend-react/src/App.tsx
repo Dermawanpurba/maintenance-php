@@ -27,6 +27,8 @@ import { SettingsView } from './components/SettingsView';
 import { ScheduledOilSamplingView } from './components/ScheduledOilSamplingView';
 import { PpuView } from './components/PpuView';
 import { TargetJamOperasiView } from './components/TargetJamOperasiView';
+import { PartServiceView } from './components/PartServiceView';
+import { PlanningPartServiceView } from './components/PlanningPartServiceView';
 import { printExecutiveReport } from './utils/printUtils';
 import { api } from './services/api';
 import {
@@ -53,7 +55,8 @@ import {
   MaintenanceWeek,
   PpuRecord,
   TargetJamOperasi,
-  TargetJamHarian
+  TargetJamHarian,
+  PartServiceItem
 } from './types';
 import { RefreshCw } from 'lucide-react';
 
@@ -91,6 +94,8 @@ export const App: React.FC = () => {
   const [targetJamOperasi, setTargetJamOperasi] = useState<TargetJamOperasi[]>([]);
   const [targetJamHarian, setTargetJamHarian] = useState<TargetJamHarian[]>([]);
   const [inspections, setInspections] = useState<any[]>([]);
+  const [partServices, setPartServices] = useState<PartServiceItem[]>([]);
+  const [planningFilterUnit, setPlanningFilterUnit] = useState<string | null>(null);
   const [isBDAwalModalOpen, setIsBDAwalModalOpen] = useState(false);
   const requestInFlight = useRef(false);
 
@@ -135,6 +140,7 @@ export const App: React.FC = () => {
         setTargetJamOperasi(data.targetJamOperasi || []);
         setTargetJamHarian(data.targetJamHarian || []);
         setInspections(data.inspections || []);
+        setPartServices(data.partServices || []);
       }
     } catch (err) {
       console.error('Failed to fetch data from API:', err);
@@ -346,7 +352,16 @@ export const App: React.FC = () => {
                     planAlats={planAlats}
                     planServices={planServices}
                     onRefresh={loadData}
-                    onNavigate={tab => setCurrentTab(tab as any)}
+                    onNavigate={(tab, equipNo) => {
+                      if (tab === 'planning_part_service') {
+                        if (equipNo) setPlanningFilterUnit(equipNo);
+                      }
+                      setCurrentTab(tab as any);
+                    }}
+                    onNavigateToPlanning={(equipNo) => {
+                      setPlanningFilterUnit(equipNo);
+                      setCurrentTab('planning_part_service');
+                    }}
                   />
                 )}
                 {currentTab === 'wo' && (
@@ -385,6 +400,20 @@ export const App: React.FC = () => {
                 {currentTab === 'parts' && (
                   <PartsStockView parts={parts} onRefresh={loadData} />
                 )}
+                {(currentTab === 'master_part_service' || ['ps_dt', 'ps_exca', 'ps_dozer', 'ps_greder'].includes(currentTab)) && (
+                  <PartServiceView
+                    initialUnitType={
+                      currentTab === 'ps_dt' ? 'DT' :
+                      currentTab === 'ps_exca' ? 'EXCA' :
+                      currentTab === 'ps_dozer' ? 'DOZER' :
+                      currentTab === 'ps_greder' ? 'GREDER' : 'ALL'
+                    }
+                    partServices={partServices}
+                    equipments={equipments}
+                    planAlats={planAlats}
+                    onRefresh={loadData}
+                  />
+                )}
                 {currentTab === 'tools' && (
                   <ToolsTrackerView tools={tools} mechanics={mechanics} onRefresh={loadData} />
                 )}
@@ -411,6 +440,18 @@ export const App: React.FC = () => {
                     targetJamOperasi={targetJamOperasi}
                     targetJamHarian={targetJamHarian}
                     onRefresh={loadData}
+                  />
+                )}
+                {currentTab === 'planning_part_service' && (
+                  <PlanningPartServiceView
+                    targetJamOperasi={targetJamOperasi}
+                    partServices={partServices}
+                    equipments={equipments}
+                    parts={parts}
+                    initialFilterUnit={planningFilterUnit}
+                    onClearFilterUnit={() => setPlanningFilterUnit(null)}
+                    onRefresh={loadData}
+                    onNavigate={tab => setCurrentTab(tab as any)}
                   />
                 )}
                 {currentTab === 'meetings' && (

@@ -40,6 +40,9 @@ use App\Models\MaintenanceWeek;
 use App\Models\PpuRecord;
 use App\Models\TargetJamOperasi;
 use App\Models\TargetJamHarian;
+use App\Models\PartService;
+use App\Models\WorkOrderPart;
+use App\Models\MasterModel;
 
 class MaintenanceController extends Controller
 {
@@ -319,6 +322,19 @@ class MaintenanceController extends Controller
 
                 case 'seedDemoTargetJam':
                     return response()->json($this->seedDemoTargetJam($data));
+
+                // Master Database Part Service (DT, EXCA, DOZER, GREDER - PS 250, 500, 1000, 2000)
+                case 'getPartServices':
+                    return response()->json($this->getPartServices($data));
+
+                case 'savePartService':
+                    return response()->json($this->savePartService($data));
+
+                case 'deletePartService':
+                    return response()->json($this->deletePartService($data));
+
+                case 'seedPartServices':
+                    return response()->json($this->seedPartServices($data));
 
                 default:
                     return response()->json(['success' => false, 'message' => "Action '{$action}' tidak dikenal"]);
@@ -603,6 +619,9 @@ class MaintenanceController extends Controller
             }
             if (class_exists(\Database\Seeders\BasicMaintenanceHistoricalSeeder::class) && Schema::hasTable('maintenance_weeks') && MaintenanceWeek::count() === 0) {
                 Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\BasicMaintenanceHistoricalSeeder', '--force' => true]);
+            }
+            if (class_exists(\Database\Seeders\PartServiceSeeder::class) && Schema::hasTable('part_services') && PartService::count() === 0) {
+                Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\PartServiceSeeder', '--force' => true]);
             }
         } catch (\Throwable $e) {
             Log::warning('Seeder execution warning: ' . $e->getMessage());
@@ -899,6 +918,7 @@ class MaintenanceController extends Controller
             'systemLogs' => $this->safelyFetch(fn() => $this->mapRecords(SystemLog::orderByDesc('id')->limit(50)->get()), []),
             'targetJamOperasi' => $this->safelyFetch(fn() => TargetJamOperasi::orderBy('section')->orderBy('equip_no')->get()->toArray(), []),
             'targetJamHarian' => $this->safelyFetch(fn() => TargetJamHarian::all()->toArray(), []),
+            'partServices' => $this->safelyFetch(fn() => PartService::orderBy('equipment')->orderBy('model')->orderBy('id')->get()->toArray(), []),
         ];
     }
 
@@ -1047,12 +1067,52 @@ class MaintenanceController extends Controller
             'kendala' => $data['kendala'] ?? '',
             'failure_reason' => $data['failure_reason'] ?? '',
             'status' => $data['status'] ?? 'Open',
+            'backlog_id' => $data['backlog_id'] ?? ($data['backlog_no'] ?? null),
             'parts_json' => is_array($data['parts_json'] ?? null) ? json_encode($data['parts_json']) : ($data['parts_json'] ?? '[]'),
             'tech' => $data['tech'] ?? '',
             'action_log' => $data['action_log'] ?? ''
         ];
 
         WorkOrder::updateOrCreate(['no_wo' => $no_wo], $fields);
+
+        // P4.1: Jika WO dibuat dari Backlog, tautkan nomor WO dan ubah status Backlog ke IN PROGRESS
+        if (!empty($fields['backlog_id'])) {
+            Backlog::where('item_id', $fields['backlog_id'])
+                ->update([
+                    'no_wo'  => $no_wo,
+                    'status' => DB::raw("CASE WHEN status = 'OPEN' THEN 'IN PROGRESS' ELSE status END"),
+                ]);
+        }
+
+        // P3.1: Sinkronisasi parts_json ke tabel relasional work_order_parts
+        $rawParts = $data['parts_json'] ?? $data['parts'] ?? null;
+        if ($rawParts !== null) {
+            $partsArray = is_array($rawParts) ? $rawParts : json_decode($rawParts, true);
+            if (is_array($partsArray)) {
+                // Hapus part lama yang belum ter-deduct untuk WO ini
+                WorkOrderPart::where('no_wo', $no_wo)->where('stock_deducted', false)->delete();
+                foreach ($partsArray as $p) {
+                    if (!is_array($p)) continue;
+                    $pNo = trim($p['part_number'] ?? $p['no'] ?? $p['part_no'] ?? '');
+                    $pName = trim($p['part_name'] ?? $p['desc'] ?? $p['description'] ?? '');
+                    $pQty = (float) ($p['qty'] ?? $p['qty_used'] ?? 0);
+                    $pUom = trim($p['uom'] ?? 'PCS');
+                    $pPrice = (float) ($p['price'] ?? $p['unit_price'] ?? 0);
+
+                    if (empty($pNo) && empty($pName)) continue;
+
+                    WorkOrderPart::create([
+                        'no_wo'       => $no_wo,
+                        'part_number' => $pNo ?: null,
+                        'part_name'   => $pName ?: $pNo,
+                        'qty_used'    => $pQty,
+                        'uom'         => $pUom ?: 'PCS',
+                        'unit_price'  => $pPrice,
+                        'total_price' => round($pQty * $pPrice, 2),
+                    ]);
+                }
+            }
+        }
 
         // Sync unit status in MasterEquip if equipment number is given
         if (!empty($fields['equip_no'])) {
@@ -1101,6 +1161,26 @@ class MaintenanceController extends Controller
 
         $wo->update($update);
 
+        // P3.1: Kurangi stok suku cadang saat WO CLOSED
+        if ($status === 'CLOSED') {
+            WorkOrderPart::deductStockForWO($no_wo);
+
+            // P4.1: Auto-close Backlog terkait saat WO CLOSED
+            Backlog::where('no_wo', $no_wo)
+                ->orWhere(function ($q) use ($wo) {
+                    if ($wo->backlog_id) {
+                        $q->where('item_id', $wo->backlog_id);
+                    }
+                })
+                ->where('status', '!=', 'CLOSED')
+                ->update(['status' => 'CLOSED', 'closed_at' => now()]);
+
+            // P4.2: Auto-close Failure Analysis jika tertaut
+            FailureAnalysis::where('no_wo', $no_wo)
+                ->where('status', 'OPEN')
+                ->update(['status' => 'CLOSED']);
+        }
+
         if (!empty($wo->equip_no)) {
             $unitStatus = $status === 'CLOSED' ? 'RFU' : ($status === 'BREAKDOWN' ? 'B/D' : 'RWN');
             MasterEquip::where('equip_no', $wo->equip_no)->update(['status' => $unitStatus]);
@@ -1112,7 +1192,11 @@ class MaintenanceController extends Controller
     public function deleteWO($data)
     {
         $no_wo = is_array($data) ? ($data['no_wo'] ?? '') : $data;
+
+        // P3.1: Hapus detail part (trigger deleting hook untuk rollback stok jika pernah di-deduct)
+        WorkOrderPart::where('no_wo', $no_wo)->get()->each->delete();
         WorkOrder::where('no_wo', $no_wo)->delete();
+
         return ['success' => true, 'message' => "Work Order {$no_wo} berhasil dihapus"];
     }
 
@@ -1130,6 +1214,8 @@ class MaintenanceController extends Controller
             'item_id' => $id,
             'tanggal' => $data['tanggal'] ?? date('Y-m-d'),
             'equip_no' => strtoupper($equipNo),
+            'no_wo' => $data['no_wo'] ?? null,
+            'priority' => strtoupper($data['priority'] ?? 'MEDIUM'),
             'deskripsi_backlog' => $desc,
             'status' => $status,
             'rencana_eksekusi' => $rencana,
@@ -1377,34 +1463,28 @@ class MaintenanceController extends Controller
             case 'MasterParts':
             case 'parts':
             case 'part':
-                $partNo = $payload['part_number'] ?? $payload['partNo'] ?? '';
-                $desc = $payload['part_name'] ?? $payload['description'] ?? $payload['name'] ?? '';
-                $uom = $payload['unit'] ?? $payload['uom'] ?? 'PCS';
-                $stockQty = $payload['stock_qty'] ?? $payload['stock'] ?? $payload['qty'] ?? 0;
-                $minStock = $payload['min_stock'] ?? 0;
-                $price = $payload['price'] ?? 0;
-                $cat = $payload['category'] ?? $payload['category_spare_part'] ?? 'Fast Moving';
-                $bin = $payload['bin_location'] ?? 'WH-A';
+                $partNo   = $payload['part_number'] ?? $payload['partNo'] ?? '';
+                $partName = $payload['part_name'] ?? $payload['description'] ?? $payload['name'] ?? '';
+                $uom      = $payload['unit'] ?? $payload['uom'] ?? 'PCS';
+                $stockQty = (float) ($payload['stock_qty'] ?? $payload['stock'] ?? $payload['qty'] ?? 0);
+                $minStock = (float) ($payload['min_stock'] ?? 0);
+                $price    = (float) ($payload['price'] ?? 0);
+                $cat      = $payload['category'] ?? $payload['category_spare_part'] ?? 'Fast Moving';
+                $bin      = $payload['bin_location'] ?? 'WH-A';
 
+                // P2.1: Tulis sekali ke master_parts (single source of truth).
+                // Stock model sudah redirect ke tabel yang sama — tidak perlu tulis ulang.
                 MasterPart::updateOrCreate(['part_number' => $partNo], [
-                    'part_number' => $partNo,
-                    'description' => $desc,
-                    'uom' => $uom,
-                    'stock' => $stockQty,
-                    'min_stock' => $minStock,
-                    'price' => $price,
+                    'part_number'         => $partNo,
+                    'part_name'           => $partName,
+                    'description'         => $partName,
+                    'uom'                 => $uom,
+                    'stock'               => $stockQty,
+                    'min_stock'           => $minStock,
+                    'price'               => $price,
                     'category_spare_part' => $cat,
-                    'qty_final' => $stockQty
-                ]);
-                Stock::updateOrCreate(['part_number' => $partNo], [
-                    'part_number' => $partNo,
-                    'description' => $desc,
-                    'uom' => $uom,
-                    'stock' => $stockQty,
-                    'min_stock' => $minStock,
-                    'price' => $price,
-                    'category_spare_part' => $cat,
-                    'qty_final' => $stockQty
+                    'bin_location'        => $bin,
+                    'qty_final'           => $stockQty,
                 ]);
                 break;
             case 'MasterComponent':
@@ -1444,8 +1524,8 @@ class MaintenanceController extends Controller
     public function deletePart($data)
     {
         $part = is_array($data) ? ($data['part_number'] ?? $data['partNo'] ?? $data['id'] ?? '') : $data;
+        // P2.1: Cukup hapus dari MasterPart — Stock model redirect ke tabel yang sama.
         MasterPart::where('part_number', $part)->delete();
-        Stock::where('part_number', $part)->delete();
         return ['success' => true, 'message' => "Part {$part} berhasil dihapus"];
     }
 
@@ -1788,6 +1868,7 @@ class MaintenanceController extends Controller
             'item_id' => $id,
             'tanggal' => $data['tanggal'] ?? ($data['incident_date'] ?? date('Y-m-d')),
             'equip_no' => $data['equip_no'] ?? ($data['no_unit'] ?? ''),
+            'no_wo' => $data['no_wo'] ?? null,
             'component_name' => $data['component_name'] ?? ($data['damage_part'] ?? ($data['component'] ?? '')),
             'chronology' => $data['chronology'] ?? ($data['root_cause'] ?? ''),
             'five_why_json' => is_array($fiveWhy) ? json_encode($fiveWhy) : (is_string($fiveWhy) ? $fiveWhy : '{}'),
@@ -1821,6 +1902,8 @@ class MaintenanceController extends Controller
             'tanggal' => $data['tanggal'] ?? date('Y-m-d'),
             'donor_unit' => $data['donor_unit'] ?? '',
             'target_unit' => $targetUnit,
+            'no_wo' => $data['no_wo'] ?? null,
+            'pcr_component_id' => $data['pcr_component_id'] ?? null,
             'component_name' => $data['component_name'] ?? '',
             'reason' => $data['reason'] ?? '',
             'authorized_by' => $pic,
@@ -2443,6 +2526,102 @@ class MaintenanceController extends Controller
             'success' => true,
             'message' => "Data Schedule Service & Downtime Gantt Matrix berhasil disinkronkan dengan data riil seluruh unit armada ({$month}/{$year})",
             'data'    => $fresh
+        ];
+    }
+
+    // =========================================================================
+    // MASTER DATABASE PART SERVICE (DT, EXCA, DOZER, GREDER - PS 250, 500, 1000, 2000)
+    // =========================================================================
+
+    public function getPartServices($data = [])
+    {
+        $query = PartService::query();
+        if (!empty($data['equipment']) && $data['equipment'] !== 'ALL') {
+            $query->where('equipment', $data['equipment']);
+        }
+        if (!empty($data['unit_type']) && $data['unit_type'] !== 'ALL') {
+            $query->where('unit_type', strtoupper(trim($data['unit_type'])));
+        }
+        if (!empty($data['model']) && $data['model'] !== 'ALL') {
+            $query->where('model', $data['model']);
+        }
+        $parts = $query->orderBy('equipment')->orderBy('model')->orderBy('id')->get();
+        return [
+            'success' => true,
+            'data' => $parts,
+            'count' => $parts->count(),
+        ];
+    }
+
+    public function savePartService($data = [])
+    {
+        $id = $data['id'] ?? null;
+        $equipment = trim($data['equipment'] ?? 'DUMP TRUCK 10 RODA');
+        $model = trim($data['model'] ?? 'FUSO FIGHTER FN62');
+        $unitType = strtoupper(trim($data['unit_type'] ?? 'DT'));
+        $partName = trim($data['part_name'] ?? '');
+        $partNumber = trim($data['part_number'] ?? '');
+
+        if (empty($partNumber) || empty($partName)) {
+            return ['success' => false, 'message' => 'Nomor Part dan Nama Part wajib diisi!'];
+        }
+
+        $payload = [
+            'equipment' => $equipment,
+            'model' => $model,
+            'unit_type' => $unitType,
+            'part_name' => $partName,
+            'part_number' => $partNumber,
+            'ps_250' => isset($data['ps_250']) && $data['ps_250'] !== '' && $data['ps_250'] !== null ? floatval($data['ps_250']) : null,
+            'ps_500' => isset($data['ps_500']) && $data['ps_500'] !== '' && $data['ps_500'] !== null ? floatval($data['ps_500']) : null,
+            'ps_1000' => isset($data['ps_1000']) && $data['ps_1000'] !== '' && $data['ps_1000'] !== null ? floatval($data['ps_1000']) : null,
+            'ps_2000' => isset($data['ps_2000']) && $data['ps_2000'] !== '' && $data['ps_2000'] !== null ? floatval($data['ps_2000']) : null,
+            'ps_4000' => isset($data['ps_4000']) && $data['ps_4000'] !== '' && $data['ps_4000'] !== null ? floatval($data['ps_4000']) : null,
+            'category' => $data['category'] ?? 'General',
+            'notes' => $data['notes'] ?? '',
+        ];
+
+        if ($id) {
+            $item = PartService::find($id);
+            if ($item) {
+                $item->update($payload);
+                $this->logAction('Update_PartService', "Update part service {$partNumber} ({$equipment} - {$model})", 'PLANNER');
+                return ['success' => true, 'message' => 'Data part service berhasil diperbarui', 'data' => $item];
+            }
+        }
+
+        $created = PartService::create($payload);
+        $this->logAction('Create_PartService', "Tambah part service {$partNumber} ({$equipment} - {$model})", 'PLANNER');
+        return ['success' => true, 'message' => 'Data part service berhasil disimpan', 'data' => $created];
+    }
+
+    public function deletePartService($data = [])
+    {
+        $id = $data['id'] ?? null;
+        if (!$id) {
+            return ['success' => false, 'message' => 'ID part service diperlukan'];
+        }
+        $item = PartService::find($id);
+        if ($item) {
+            $partNo = $item->part_number;
+            $unit = $item->equipment ?? $item->unit_type;
+            $item->delete();
+            $this->logAction('Delete_PartService', "Hapus part service {$partNo} ({$unit})", 'PLANNER');
+            return ['success' => true, 'message' => 'Part service berhasil dihapus'];
+        }
+        return ['success' => false, 'message' => 'Data part service tidak ditemukan'];
+    }
+
+    public function seedPartServices($data = [])
+    {
+        Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\PartServiceSeeder', '--force' => true]);
+        $parts = PartService::orderBy('equipment')->orderBy('model')->orderBy('id')->get();
+        $this->logAction('Reset_PartServices', "Reset seluruh database part service ke data bawaan OEM", 'PLANNER');
+        return [
+            'success' => true,
+            'message' => 'Master database part service berhasil di-reset ke format matrix OEM (DT, Exca, Dozer, Greder)',
+            'data' => $parts,
+            'count' => $parts->count(),
         ];
     }
 }

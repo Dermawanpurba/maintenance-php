@@ -105,6 +105,12 @@ Route::prefix('maintenance')->group(function () {
     ]));
     Route::post('/target-jam-harian', [\App\Http\Controllers\Api\MaintenanceController::class, 'saveJamHarian']);
     Route::post('/target-jam-operasi/seed-demo', fn (\Illuminate\Http\Request $req) => response()->json(app(\App\Http\Controllers\Api\MaintenanceController::class)->seedDemoTargetJam($req->all())));
+
+    // Master Database Part Service (DT, EXCA, DOZER, GREDER - PS 250, 500, 1000, 2000)
+    Route::get('/part-services', fn (\Illuminate\Http\Request $req) => response()->json(app(\App\Http\Controllers\Api\MaintenanceController::class)->getPartServices($req->all())));
+    Route::post('/part-services', fn (\Illuminate\Http\Request $req) => response()->json(app(\App\Http\Controllers\Api\MaintenanceController::class)->savePartService($req->all())));
+    Route::delete('/part-services/{id}', fn ($id) => response()->json(app(\App\Http\Controllers\Api\MaintenanceController::class)->deletePartService(['id' => $id])));
+    Route::post('/part-services/seed-default', fn () => response()->json(app(\App\Http\Controllers\Api\MaintenanceController::class)->seedPartServices()));
 });
 
 // 1-Click .ZIP System Backup Global Route

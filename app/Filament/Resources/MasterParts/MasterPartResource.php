@@ -20,7 +20,27 @@ class MasterPartResource extends Resource
 {
     protected static ?string $model = MasterPart::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|\BackedEnum|null $navigationIcon  = Heroicon::OutlinedRectangleStack;
+    protected static \UnitEnum|string|null   $navigationGroup = 'Master Data';
+    protected static ?string $navigationLabel  = 'Katalog Suku Cadang';
+    protected static ?int    $navigationSort   = 3;
+
+    /**
+     * Tampilkan badge merah jika ada part dengan stok di bawah minimum.
+     */
+    public static function getNavigationBadge(): ?string
+    {
+        $lowStockCount = MasterPart::whereColumn('stock', '<', 'min_stock')
+            ->where('min_stock', '>', 0)
+            ->count();
+
+        return $lowStockCount > 0 ? (string) $lowStockCount : null;
+    }
+
+    public static function getNavigationBadgeColor(): string
+    {
+        return 'danger';
+    }
 
     public static function form(Schema $schema): Schema
     {

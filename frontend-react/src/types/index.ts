@@ -256,6 +256,24 @@ export interface PlanService {
   kategori?: string;
 }
 
+export interface PartServiceItem {
+  id?: number | string;
+  equipment: string;
+  model: string;
+  unit_type?: 'DT' | 'EXCA' | 'DOZER' | 'GREDER' | string;
+  part_name: string;
+  part_number: string;
+  ps_250?: number | null;
+  ps_500?: number | null;
+  ps_1000?: number | null;
+  ps_2000?: number | null;
+  ps_4000?: number | null;
+  category?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface AppUser {
   id?: number | string;
   username: string;

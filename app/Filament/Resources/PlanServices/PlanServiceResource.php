@@ -20,7 +20,19 @@ class PlanServiceResource extends Resource
 {
     protected static ?string $model = PlanService::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-calendar-days';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Master & Warehouse';
+
+    protected static ?string $navigationLabel = 'Estimasi Service (Plan Service)';
+
+    protected static ?string $modelLabel = 'Plan Service';
+
+    protected static ?string $pluralModelLabel = 'Estimasi Service (Plan Service)';
+
+    protected static ?int $navigationSort = 2;
+
+    protected static ?string $recordTitleAttribute = 'equip_no';
 
     public static function form(Schema $schema): Schema
     {

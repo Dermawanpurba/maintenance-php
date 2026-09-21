@@ -164,6 +164,11 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     subtitle: 'Rencana jam operasi harian per unit alat berat, next service, PM type, dan periode kalender',
     tag: 'PLAN ALAT'
   },
+  planning_part_service: {
+    title: 'Planning Part Service — Estimasi Kebutuhan Bulanan',
+    subtitle: 'Kalkulasi kebutuhan suku cadang, oli & filter 1 bulan berjalan berbasis Target Jam Operasi dan Master Part Service',
+    tag: 'PART SERVICE PLANNING'
+  },
   fleet: {
     title: 'Master Unit & Monitoring Armada Alat Berat',
     subtitle: 'Kesiapan unit, lokasi site, dan status operasional (RFU / RWN / B/D)',
@@ -183,6 +188,31 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     title: 'Master Crew Teknisi & Struktur Komponen',
     subtitle: 'Manajemen personil mekanik, pelapor kerusakan pit, dan hierarki komponen',
     tag: 'CREW & COMPONENT'
+  },
+  master_part_service: {
+    title: 'Master Part Service — Matrix Interval Periodic Service',
+    subtitle: 'Database suku cadang & pelumas servis berkala interval PS 250, 500, 1000, 2000, 4000 jam',
+    tag: 'PART SERVICE MATRIX'
+  },
+  ps_dt: {
+    title: 'Master Part Service — Dump Truck (DT)',
+    subtitle: 'Katalog Bill of Materials (BOM) suku cadang servis berkala PS 250, 500, 1000, 2000 unit Dump Truck',
+    tag: 'PART SERVICE DT'
+  },
+  ps_exca: {
+    title: 'Master Part Service — Excavator (Exca)',
+    subtitle: 'Katalog Bill of Materials (BOM) suku cadang servis berkala PS 250, 500, 1000, 2000 unit Excavator',
+    tag: 'PART SERVICE EXCA'
+  },
+  ps_dozer: {
+    title: 'Master Part Service — Bulldozer (Dozer)',
+    subtitle: 'Katalog Bill of Materials (BOM) suku cadang servis berkala PS 250, 500, 1000, 2000 unit Bulldozer',
+    tag: 'PART SERVICE DOZER'
+  },
+  ps_greder: {
+    title: 'Master Part Service — Motor Grader (Greder)',
+    subtitle: 'Katalog Bill of Materials (BOM) suku cadang servis berkala PS 250, 500, 1000, 2000 unit Motor Grader',
+    tag: 'PART SERVICE GREDER'
   },
   manage_users: {
     title: 'Kelola Pengguna & Hak Akses Fitur',
