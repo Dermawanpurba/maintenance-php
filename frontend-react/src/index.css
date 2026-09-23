@@ -29,31 +29,21 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
-/* Capsule Sidebar Styles (Desktop) */
-@media (min-width: 768px) {
-  .capsule-sidebar {
-    position: sticky;
-    top: 14px;
-    height: calc(100vh - 28px);
-    margin: 14px 0 14px 14px;
-    border-radius: 28px;
-    background: linear-gradient(180deg, #0f172a 0%, #060a13 100%);
-    box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.08);
-    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 40;
-    overflow: visible !important;
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-  }
+/* Double Sidebar Smooth Transition */
+.sidebar-transition {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              opacity 0.25s ease-in-out,
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-  .capsule-sidebar.expanded {
-    width: 265px !important;
-  }
-
-  .capsule-sidebar.collapsed {
-    width: 78px !important;
-  }
+/* Custom Refined Scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Sidebar Collapse Toggle Button */

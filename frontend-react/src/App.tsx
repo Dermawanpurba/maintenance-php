@@ -63,6 +63,7 @@ import { RefreshCw } from 'lucide-react';
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSecondarySidebarOpen, setIsSecondarySidebarOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [apiOnline, setApiOnline] = useState(true);
@@ -215,8 +216,8 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen h-[100dvh] overflow-hidden bg-[#f1f5f9] text-slate-800 antialiased selection:bg-blue-600 selection:text-white">
-      {/* Capsule Collapsible Sidebar (Desktop) / Slide-over Drawer (Mobile) */}
+    <div className="flex h-screen h-[100dvh] w-full p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden bg-slate-100/90 text-slate-800 antialiased selection:bg-blue-600 selection:text-white">
+      {/* Level 1 & 2: Double Sidebar (Primary Icon Rail + Collapsible Secondary Sidebar) */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={tab => setCurrentTab(tab)}
@@ -228,10 +229,14 @@ export const App: React.FC = () => {
           backlog: backlogs.length,
           parts: parts.length,
         }}
+        isSecondaryOpen={isSecondarySidebarOpen}
+        onToggleSecondary={() => setIsSecondarySidebarOpen(prev => !prev)}
+        onOpenBDAwal={() => setIsBDAwalModalOpen(true)}
+        onPrintExecSummary={handlePrintExecReport}
       />
 
-      {/* Main Content Pane */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      {/* Level 3: Main Content Workspace (Area Konten Utama) */}
+      <div className="flex-1 flex flex-col min-w-0 bg-white rounded-[26px] shadow-sm border border-slate-200/80 overflow-hidden relative">
         {/* Top Header */}
         <Header
           currentTab={currentTab}
@@ -242,10 +247,12 @@ export const App: React.FC = () => {
           refreshing={refreshing}
           onOpenBDAwal={() => setIsBDAwalModalOpen(true)}
           onPrintExecSummary={handlePrintExecReport}
+          isSecondaryOpen={isSecondarySidebarOpen}
+          onToggleSecondary={() => setIsSecondarySidebarOpen(prev => !prev)}
         />
 
         {/* Viewport Scroll Container */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 relative bg-[#f1f5f9] pb-24 md:pb-8">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 relative bg-slate-50/50 pb-24 md:pb-8">
           <div className="max-w-[1440px] mx-auto">
             {loading ? (
               <div className="h-96 flex flex-col items-center justify-center space-y-3">
@@ -483,7 +490,7 @@ export const App: React.FC = () => {
             <span>•</span>
             <span>PT. Benamakmur Selaras Sejahtera</span>
             <span>•</span>
-            <span className="text-blue-600 font-bold">React 18 + SQLite WAL</span>
+            <span className="text-brand-600 font-bold">React 18 + SQLite WAL</span>
           </div>
           <div className="hidden sm:flex items-center space-x-2 text-slate-400">
             <span>Plant Maintenance System</span>

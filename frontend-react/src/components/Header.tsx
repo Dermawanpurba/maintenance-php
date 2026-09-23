@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, RefreshCw, Shield, ExternalLink, Activity, AlertTriangle, Printer } from 'lucide-react';
+import { Menu, RefreshCw, Shield, ExternalLink, Activity, AlertTriangle, Printer, PanelLeft } from 'lucide-react';
 import { NavTab } from './Sidebar';
 
 interface HeaderProps {
@@ -11,6 +11,8 @@ interface HeaderProps {
   refreshing: boolean;
   onOpenBDAwal?: () => void;
   onPrintExecSummary?: () => void;
+  isSecondaryOpen?: boolean;
+  onToggleSecondary?: () => void;
 }
 
 const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> = {
@@ -239,7 +241,9 @@ export const Header: React.FC<HeaderProps> = ({
   onRefresh,
   refreshing,
   onOpenBDAwal,
-  onPrintExecSummary
+  onPrintExecSummary,
+  isSecondaryOpen,
+  onToggleSecondary
 }) => {
   const current = titles[currentTab] || {
     title: 'WOSys ERP Management',
@@ -248,17 +252,30 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-16 flex-shrink-0 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-      {/* Left: Hamburger + Title info */}
+    <header className="h-16 flex-shrink-0 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+      {/* Left: Hamburger (Mobile) / Sidebar Toggle (Desktop) + Title info */}
       <div className="flex items-center space-x-3 min-w-0">
+        {/* Mobile Hamburger Drawer Trigger */}
         <button
           onClick={onOpenSidebar}
-          className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 md:hidden transition-colors"
-          title="Buka Menu"
+          className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 md:hidden transition-colors cursor-pointer"
+          title="Buka Double Sidebar"
           type="button"
         >
           <Menu className="w-5 h-5" />
         </button>
+
+        {/* Desktop Quick Toggle Icon */}
+        {onToggleSecondary && (
+          <button
+            onClick={onToggleSecondary}
+            className="hidden md:flex p-2 text-slate-500 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+            title={isSecondaryOpen ? 'Sembunyikan Sub-Sidebar' : 'Buka Sub-Sidebar'}
+            type="button"
+          >
+            <PanelLeft className="w-5 h-5" />
+          </button>
+        )}
 
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2">
@@ -268,6 +285,8 @@ export const Header: React.FC<HeaderProps> = ({
             <h2 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight truncate">
               {current.title}
             </h2>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 hidden sm:inline-block" />
+            <span className="text-xs text-emerald-600 font-semibold hidden md:inline">Online</span>
           </div>
           <p className="text-[11px] text-slate-500 font-medium truncate hidden md:block">
             {current.subtitle}
@@ -277,6 +296,17 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Actions & Badges */}
       <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+        {/* Toggle Sub-Sidebar Pill Button (Desktop) */}
+        {onToggleSecondary && (
+          <button
+            onClick={onToggleSecondary}
+            className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+            type="button"
+          >
+            <span>{isSecondaryOpen ? 'Sembunyikan Sub-Sidebar' : 'Buka Sub-Sidebar'}</span>
+          </button>
+        )}
+
         {/* Latency / API status */}
         <div className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold">
           <span
