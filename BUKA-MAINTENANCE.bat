@@ -12,9 +12,12 @@ echo.
 echo [1/3] Memeriksa Database SQLite...
 if not exist "database\database.sqlite" (
     type nul > "database\database.sqlite"
-    echo [v] Database SQLite baru dibuat.
+    echo [!] File database.sqlite tidak ditemukan.
+    echo [*] Membuat database baru & mengisi data default (migrate & db:seed)...
     php artisan migrate --force
     php artisan db:seed --force
+) else (
+    echo [v] Database SQLite ditemukan: database\database.sqlite
 )
 
 echo.

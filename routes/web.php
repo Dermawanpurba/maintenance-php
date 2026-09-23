@@ -15,6 +15,16 @@ Route::match(['get', 'post', 'options'], '/router', [MaintenanceController::clas
 Route::match(['get', 'post', 'options'], '/maintenance/router', [MaintenanceController::class, 'router']);
 Route::match(['get', 'post', 'options'], '/maintenance', [MaintenanceController::class, 'router']);
 Route::match(['get', 'post', 'options'], '/login', [MaintenanceController::class, 'router']);
+Route::get('/classic', function () {
+    $classicPath = public_path('index.classic.html');
+    if (file_exists($classicPath)) {
+        return response()->file($classicPath, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        ]);
+    }
+    return redirect('/');
+});
 Route::match(['get', 'post', 'options'], '/', function (Request $request) {
     if ($request->isMethod('post')) {
         return app(MaintenanceController::class)->router($request);
