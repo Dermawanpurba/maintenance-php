@@ -840,22 +840,18 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
     }
   }, [normalizedCategory]);
 
-  // Active weeks from database (defaults to 1–20 September 2026 if DB is empty)
+  // Active weeks from database (pure database driven, no hardcoded mock fallbacks)
   const activeWeeksList: MaintenanceWeek[] = useMemo(() => {
     if (maintenanceWeeks && maintenanceWeeks.length > 0) {
       return [...maintenanceWeeks].sort((a, b) => a.id - b.id);
     }
-    return [
-      { id: 1, week_no: 'WEEK 36', label: 'Week 36 (01 Sep - 06 Sep 2026)', is_active: false, target_compliance: 100 },
-      { id: 2, week_no: 'WEEK 37', label: 'Week 37 (07 Sep - 13 Sep 2026)', is_active: false, target_compliance: 100 },
-      { id: 3, week_no: 'WEEK 38', label: 'Week 38 (14 Sep - 20 Sep 2026)', is_active: true, target_compliance: 100 }
-    ];
+    return [];
   }, [maintenanceWeeks]);
 
   // Determine current active week from database
   const defaultActiveWeek = useMemo(() => {
     const active = activeWeeksList.find(w => w.is_active);
-    return active ? active.week_no : (activeWeeksList[activeWeeksList.length - 1]?.week_no || 'WEEK 38');
+    return active ? active.week_no : (activeWeeksList[activeWeeksList.length - 1]?.week_no || 'ALL');
   }, [activeWeeksList]);
 
   // Selected unit & form state
@@ -901,8 +897,10 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
   const ModuleIcon = currentModule.icon;
 
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
-  const [weekNo, setWeekNo] = useState<string>(defaultActiveWeek);
-  const [hm, setHm] = useState(Number(initialEq?.last_hm || 47006));
+  const [weekNo, setWeekNo] = useState<string>(
+    defaultActiveWeek !== 'ALL' ? defaultActiveWeek : (activeWeeksList[0]?.week_no || '')
+  );
+  const [hm, setHm] = useState(Number(initialEq?.last_hm || 0));
   const [tech, setTech] = useState('Rahmat Hidayat (Lead Tech)');
   const [notes, setNotes] = useState('');
   const [achievementPct, setAchievementPct] = useState<number>(100);
@@ -921,10 +919,12 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
 
   // Sync default week when activeWeeksList loads
   useEffect(() => {
-    if (defaultActiveWeek && !weekNo) {
+    if (defaultActiveWeek && defaultActiveWeek !== 'ALL' && (!weekNo || weekNo === 'ALL')) {
       setWeekNo(defaultActiveWeek);
+    } else if (!weekNo && activeWeeksList.length > 0) {
+      setWeekNo(activeWeeksList[0].week_no);
     }
-  }, [defaultActiveWeek]);
+  }, [defaultActiveWeek, activeWeeksList, weekNo]);
 
   // ==================== 100% PURE DATABASE-DRIVEN PERFORMANCE MATRIX ====================
   // Strictly calculated from actual pm_records rows in SQLite database without ANY hardcoded baseline fallbacks!
@@ -1027,8 +1027,8 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
         equip_no: r.equip_no || 'EX1210',
         eq_model: eq?.model || 'Equipment',
         category_family: cat,
-        tanggal: r.tanggal || '2026-09-19',
-        week_no: r.week_no || 'WEEK 38',
+        tanggal: r.tanggal || '-',
+        week_no: r.week_no || '-',
         hm: Number(r.hm_pm || 0),
         category: adapted ? adapted.name : (matchedConfig ? matchedConfig.name : (r.pm_type || 'Basic Maintenance')),
         subModuleId: matchedConfig ? matchedConfig.id : 'bm_inspection',
@@ -1070,6 +1070,11 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
   // Submit actual operational record to database
   const handleSaveReport = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!weekNo || weekNo === 'ALL') {
+      alert('⚠️ Periode minggu belum tersedia atau belum dipilih!\n\nSilakan klik tombol "+ Buat Periode" untuk menambahkan periode minggu operasional terlebih dahulu ke database SQLite.');
+      setIsWeekModalOpen(true);
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -1464,21 +1469,49 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
                   onChange={e => setOverviewWeekFilter(e.target.value)}
                   className="w-full text-xs font-black bg-blue-50 border border-blue-300 rounded-lg px-3 py-2 text-blue-900 focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="ALL">Semua periode — tampilkan tren lengkap</option>
-                  {activeWeeksList.map(w => (
-                    <option key={w.week_no} value={w.week_no}>
-                      {w.week_no}{w.is_active ? ' • AKTIF' : ' • PERIODE SEBELUMNYA'}{w.label ? ` — ${w.label}` : ''}
-                    </option>
-                  ))}
+                  {activeWeeksList.length === 0 ? (
+                    <option value="ALL">Belum ada periode minggu di database</option>
+                  ) : (
+                    <>
+                      <option value="ALL">Semua periode — tampilkan tren lengkap</option>
+                      {activeWeeksList.map(w => (
+                        <option key={w.week_no} value={w.week_no}>
+                          {w.week_no}{w.is_active ? ' • AKTIF' : ' • PERIODE SEBELUMNYA'}{w.label ? ` — ${w.label}` : ''}
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
                 <span className="text-[11px] text-slate-500 font-medium">
-                  {overviewWeekFilter === 'ALL'
-                    ? 'Menampilkan seluruh periode minggu yang tersimpan di database.'
-                    : `Membuka data ${selectedOverviewWeek?.label || overviewWeekFilter}.`}
+                  {activeWeeksList.length === 0
+                    ? 'Belum ada data periode operasional. Klik "Kelola Minggu" untuk menambahkan periode baru.'
+                    : overviewWeekFilter === 'ALL'
+                      ? 'Menampilkan seluruh periode minggu yang tersimpan di database.'
+                      : `Membuka data ${selectedOverviewWeek?.label || overviewWeekFilter}.`}
                 </span>
               </div>
             </div>
           </div>
+
+          {/* Empty State Banner when 0 weeks in database */}
+          {activeWeeksList.length === 0 && (
+            <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3.5 flex items-center justify-between gap-3 text-amber-900 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <Calendar className="w-5 h-5 text-amber-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold">Database Periode Minggu Masih Kosong</p>
+                  <p className="text-[11px] text-amber-700">Data periode minggu operasional belum diinput ke database SQLite. Silakan gunakan tombol &quot;Kelola Minggu&quot; untuk menambahkan periode baru.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWeekModalOpen(true)}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black shrink-0 transition-colors shadow-xs"
+              >
+                + Buat Periode Minggu
+              </button>
+            </div>
+          )}
 
           {/* Main Grid: Left 8 Charts + Right Executive Performance Table */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -1501,9 +1534,11 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
                   </span>
                   <h3 className="text-lg font-black mt-0.5">Basic Maintenance Compliance</h3>
                   <p className="text-xs text-slate-300 mt-1">
-                    {overviewWeekFilter === 'ALL'
-                      ? `Kepatuhan actual seluruh armada site plant (${activeWeeksList[0]?.week_no || 'W40'} - ${activeWeeksList[activeWeeksList.length - 1]?.week_no || 'W43'})`
-                      : `Kepatuhan actual seluruh armada site plant pada ${selectedOverviewWeek?.label || overviewWeekFilter}`}
+                    {activeWeeksList.length === 0
+                      ? 'Belum ada periode operasional terdaftar di database.'
+                      : overviewWeekFilter === 'ALL'
+                        ? `Kepatuhan actual seluruh armada site plant (${activeWeeksList[0]?.week_no || ''} - ${activeWeeksList[activeWeeksList.length - 1]?.week_no || ''})`
+                        : `Kepatuhan actual seluruh armada site plant pada ${selectedOverviewWeek?.label || overviewWeekFilter}`}
                   </p>
                   <div className="mt-3 flex items-center gap-3">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-black border border-emerald-500/30">
@@ -1849,11 +1884,15 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
                     onChange={e => setWeekNo(e.target.value)}
                     className="w-full text-xs font-black bg-blue-50/60 border border-blue-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 text-blue-800"
                   >
-                    {activeWeeksList.map(w => (
-                      <option key={w.week_no} value={w.week_no}>
-                        {w.week_no} {w.is_active ? '(Aktif Saat Ini)' : ''} {w.label ? `— ${w.label}` : ''}
-                      </option>
-                    ))}
+                    {activeWeeksList.length === 0 ? (
+                      <option value="" disabled>Belum ada periode minggu di DB (Klik + Buat Periode)</option>
+                    ) : (
+                      activeWeeksList.map(w => (
+                        <option key={w.week_no} value={w.week_no}>
+                          {w.week_no} {w.is_active ? '(Aktif Saat Ini)' : ''} {w.label ? `— ${w.label}` : ''}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -2118,34 +2157,42 @@ export const BasicMaintenanceView: React.FC<BasicMaintenanceViewProps> = ({
                 </h4>
                 <p className="text-[10px] text-slate-500 mb-2">Pilih periode lama untuk langsung membukanya pada halaman Overview.</p>
                 <div className="max-h-44 overflow-y-auto space-y-1.5 border border-slate-200 rounded-xl p-2 bg-slate-50">
-                  {activeWeeksList.map(w => (
-                    <button
-                      type="button"
-                      key={w.week_no}
-                      onClick={() => {
-                        setOverviewWeekFilter(w.week_no);
-                        setActiveTab('dashboard');
-                        setIsWeekModalOpen(false);
-                        if (onNavigate) onNavigate('bm_dashboard');
-                      }}
-                      className={`w-full p-2 rounded-lg border flex items-center justify-between gap-3 text-xs text-left transition-colors ${
-                        overviewWeekFilter === w.week_no
-                          ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-200'
-                          : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/40'
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <span className="font-black text-slate-900">{w.week_no}</span>
-                        {w.is_active && (
-                          <span className="ml-2 bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded">
-                            AKTIF
-                          </span>
-                        )}
-                        <p className="text-[10px] text-slate-500 truncate">{w.label || w.notes || 'Tanpa label'}</p>
-                      </div>
-                      <span className="shrink-0 text-[9px] font-black uppercase text-blue-700">Buka Overview →</span>
-                    </button>
-                  ))}
+                  {activeWeeksList.length === 0 ? (
+                    <div className="text-center py-6 px-4">
+                      <Calendar className="w-7 h-7 text-slate-300 mx-auto mb-1.5" />
+                      <p className="text-xs font-bold text-slate-600">Belum ada periode minggu di database</p>
+                      <p className="text-[10px] text-slate-400">Tambahkan periode minggu operasional baru pada formulir di bawah ini.</p>
+                    </div>
+                  ) : (
+                    activeWeeksList.map(w => (
+                      <button
+                        type="button"
+                        key={w.week_no}
+                        onClick={() => {
+                          setOverviewWeekFilter(w.week_no);
+                          setActiveTab('dashboard');
+                          setIsWeekModalOpen(false);
+                          if (onNavigate) onNavigate('bm_dashboard');
+                        }}
+                        className={`w-full p-2 rounded-lg border flex items-center justify-between gap-3 text-xs text-left transition-colors ${
+                          overviewWeekFilter === w.week_no
+                            ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-200'
+                            : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/40'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <span className="font-black text-slate-900">{w.week_no}</span>
+                          {w.is_active && (
+                            <span className="ml-2 bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded">
+                              AKTIF
+                            </span>
+                          )}
+                          <p className="text-[10px] text-slate-500 truncate">{w.label || w.notes || 'Tanpa label'}</p>
+                        </div>
+                        <span className="shrink-0 text-[9px] font-black uppercase text-blue-700">Buka Overview →</span>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 

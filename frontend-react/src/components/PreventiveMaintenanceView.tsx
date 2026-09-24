@@ -77,26 +77,7 @@ export const PreventiveMaintenanceView: React.FC<PreventiveMaintenanceViewProps>
     tech: string;
     items_count: number;
     notes: string;
-  }>>([
-    {
-      id: 'PM-001',
-      equip_no: equipments[0]?.equip_no || 'EX-301',
-      tanggal: '2026-09-10',
-      hm: 4520,
-      tech: 'Brayen (Mekanik)',
-      items_count: current.items.length,
-      notes: 'Pekerjaan selesai 100%, semua titik dalam kondisi prima.'
-    },
-    {
-      id: 'PM-002',
-      equip_no: equipments[1]?.equip_no || 'DZ-007',
-      tanggal: '2026-09-08',
-      hm: 5120,
-      tech: 'Andi Herwan',
-      items_count: current.items.length - 1,
-      notes: 'Perlu penggantian seal minor pada servis berikutnya.'
-    }
-  ]);
+  }>>([]);
 
   const handleToggle = (item: string) => {
     setCheckedItems(prev => ({
@@ -386,33 +367,44 @@ export const PreventiveMaintenanceView: React.FC<PreventiveMaintenanceViewProps>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {historyList.map((hist, idx) => (
-                  <tr key={hist.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-blue-600">{hist.id}</td>
-                    <td className="py-3.5 px-4 text-slate-500">{hist.tanggal}</td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-black text-[11px]">
-                        {hist.equip_no}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-700">{hist.hm.toLocaleString()} HM</td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold text-[10px]">
-                        {hist.items_count} / {current.items.length} Poin Selesai
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-600">{hist.tech}</td>
-                    <td className="py-3.5 px-4 max-w-xs truncate text-slate-600" title={hist.notes}>
-                      {hist.notes}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] inline-flex items-center space-x-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        <span>VERIFIED</span>
-                      </span>
+                {historyList.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <CheckCircle2 className="w-8 h-8 text-slate-300" />
+                        <span className="font-semibold text-xs">Belum ada riwayat pelaksanaan untuk modul {current.title}</span>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  historyList.map((hist, idx) => (
+                    <tr key={hist.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3.5 px-4 font-mono font-bold text-blue-600">{hist.id}</td>
+                      <td className="py-3.5 px-4 text-slate-500">{hist.tanggal}</td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-black text-[11px]">
+                          {hist.equip_no}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-bold text-slate-700">{hist.hm.toLocaleString()} HM</td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold text-[10px]">
+                          {hist.items_count} / {current.items.length} Poin Selesai
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-600">{hist.tech}</td>
+                      <td className="py-3.5 px-4 max-w-xs truncate text-slate-600" title={hist.notes}>
+                        {hist.notes}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] inline-flex items-center space-x-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>VERIFIED</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

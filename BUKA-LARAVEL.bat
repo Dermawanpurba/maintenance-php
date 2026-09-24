@@ -1,5 +1,5 @@
 @echo off
-title WOSys ERP - Enterprise Maintenance Management System (Port 8003)
+title WOSys ERP - Laravel 13 Backend Server (Port 8003)
 color 0A
 cd /d "%~dp0"
 

@@ -81,53 +81,14 @@ export const PcrView: React.FC<PcrViewProps> = ({
     install_hm: 0,
     target_lifetime_hm: 10000,
     current_hm: initialUnitHm,
-    estimated_cost: 65000000,
+    estimated_cost: 0,
     scheduled_date: new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0],
     status: 'MONITORING',
   });
 
-  const fallbackPcr: PcrItem[] = pcrList.length > 0 ? pcrList : [
-    {
-      item_id: 'PCR-001',
-      equip_no: 'EX-201',
-      component_name: 'Engine Complete 6BTAA-5.9',
-      install_hm: 0,
-      target_lifetime_hm: 12000,
-      current_hm: 9450,
-      remaining_hm: 2550,
-      status: 'MONITORING',
-      estimated_cost: 165000000,
-      scheduled_date: '2026-11-20'
-    },
-    {
-      item_id: 'PCR-002',
-      equip_no: 'EX-302',
-      component_name: 'Hydraulic Main Pump (K3V140DT)',
-      install_hm: 1200,
-      target_lifetime_hm: 10000,
-      current_hm: 8800,
-      remaining_hm: 1200,
-      status: 'WARNING / PERSIAPAN PR',
-      estimated_cost: 85000000,
-      scheduled_date: '2026-10-15'
-    },
-    {
-      item_id: 'PCR-003',
-      equip_no: 'DZ-002',
-      component_name: 'Final Drive LH & RH',
-      install_hm: 0,
-      target_lifetime_hm: 8000,
-      current_hm: 6700,
-      remaining_hm: 1300,
-      status: 'MONITORING',
-      estimated_cost: 70000000,
-      scheduled_date: '2026-10-30'
-    }
-  ];
-
   // Olah data PCR dengan live sync Daily HM
   const processedPcrList = useMemo(() => {
-    return fallbackPcr.map(p => {
+    return (pcrList || []).map(p => {
       const equipNo = p.equip_no || '';
       const unitLastHm = getLatestUnitHm(equipNo);
       const installHm = Number(p.install_hm || 0);
@@ -161,7 +122,7 @@ export const PcrView: React.FC<PcrViewProps> = ({
         status: status
       };
     });
-  }, [fallbackPcr, dailyHms, equipments]);
+  }, [pcrList, dailyHms, equipments]);
 
   // Handler saat memilih unit pada modal
   const handleSelectUnit = (unitNo: string) => {
@@ -250,6 +211,10 @@ export const PcrView: React.FC<PcrViewProps> = ({
   };
 
   const handleDelete = async (id: string | number) => {
+    if (!id) {
+      alert('ID jadwal PCR tidak ditemukan');
+      return;
+    }
     if (!window.confirm('Hapus jadwal Planned Component Replacement (PCR) ini?')) return;
     try {
       const res = await api.deletePCR(id);
@@ -257,6 +222,20 @@ export const PcrView: React.FC<PcrViewProps> = ({
         onRefresh();
       } else {
         alert(res.message || 'Gagal menghapus');
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!window.confirm('PERINGATAN: Apakah Anda yakin ingin menghapus SELURUH data Planned Component Replacement (PCR)? Data yang dihapus tidak dapat dikembalikan.')) return;
+    try {
+      const res = await api.deleteAllPCR();
+      if (res.success) {
+        onRefresh();
+      } else {
+        alert(res.message || 'Gagal menghapus seluruh data PCR');
       }
     } catch (err: any) {
       alert('Error: ' + err.message);
@@ -414,6 +393,17 @@ export const PcrView: React.FC<PcrViewProps> = ({
                 className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-orange-500 text-slate-800 placeholder-slate-400 font-medium w-44 sm:w-56 transition-all"
               />
             </div>
+            {processedPcrList.length > 0 && (
+              <button
+                type="button"
+                onClick={handleDeleteAll}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black transition-all cursor-pointer whitespace-nowrap"
+                title="Hapus seluruh data PCR sekaligus"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                <span>Hapus Semua</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => printPcrSummaryReport(filtered, equipments, dailyHms)}

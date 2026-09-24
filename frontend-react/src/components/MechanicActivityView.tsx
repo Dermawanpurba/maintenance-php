@@ -82,12 +82,12 @@ export const MechanicActivityView: React.FC<MechanicActivityViewProps> = ({
 
   // Form State
   const [formDate, setFormDate] = useState(todayStr);
-  const [selectedMechanics, setSelectedMechanics] = useState<string[]>(['Agus Priyono']);
+  const [selectedMechanics, setSelectedMechanics] = useState<string[]>([]);
   const [customMechanic, setCustomMechanic] = useState('');
   const [activityRows, setActivityRows] = useState<ActivityRowItem[]>([
     {
       id: 'row_1',
-      no_wo: workOrders[0]?.no_wo || 'WO-001201',
+      no_wo: workOrders[0]?.no_wo || '',
       aktifitas: '',
       jam_mulai: '08:00',
       jam_selesai: '10:00'

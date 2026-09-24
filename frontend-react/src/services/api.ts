@@ -121,6 +121,10 @@ export const api = {
     return this.postAction('deletePCR', { id });
   },
 
+  async deleteAllPCR() {
+    return this.postAction('deletePCR', { id: 'all', all: true });
+  },
+
   // ==================== SWAB / KANIBALISASI ====================
   async saveSwabComponent(data: any) {
     return this.postAction('saveSwabComponent', data);

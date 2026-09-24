@@ -65,6 +65,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     shift: '1'
   });
 
+  // Klasifikasi baku: BS = Breakdown Scheduled, BUS = Breakdown Unscheduled.
+  // Normalisasi ini mempertahankan kompatibilitas nilai historis SCH/UNSCH.
+  const breakdownType = (value?: string): 'scheduled' | 'unscheduled' | null => {
+    const type = String(value || '').trim().toUpperCase().replace(/[\s_-]+/g, ' ');
+    if (['UNSCH', 'UNSCHEDULED', 'BREAKDOWN UNSCHEDULED', 'BUS'].includes(type)) return 'unscheduled';
+    if (['SCH', 'SCHEDULED', 'BREAKDOWN SCHEDULED', 'BS'].includes(type) || type.startsWith('PM')) return 'scheduled';
+    return null;
+  };
+
+  // Filter work orders within selected period
+  const filteredWOs = useMemo(() => {
+    return workOrders.filter(w => {
+      const tgl = w.tgl_rusak || w.tanggal;
+      if (!tgl) return true;
+      const d = String(tgl).split('T')[0];
+      return d >= startDate && d <= endDate;
+    });
+  }, [workOrders, startDate, endDate]);
+
   // Calculate Operational & Engineering 4-Pillars Metrics
   const metrics = useMemo(() => {
     const totalUnits = equipments.length || 1;
@@ -86,26 +105,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const readyCount = rfu + rwn;
     const pa = Math.min(100, Math.max(0, Math.round((readyCount / totalUnits) * 100)));
 
-    // Filter work orders
-    const filteredWOs = workOrders.filter(w => {
-      const tgl = w.tgl_rusak || w.tanggal;
-      if (!tgl) return true;
-      const d = String(tgl).split('T')[0];
-      return d >= startDate && d <= endDate;
-    });
-
-    // Klasifikasi baku: BS = Breakdown Scheduled, BUS = Breakdown Unscheduled.
-    // Normalisasi ini mempertahankan kompatibilitas nilai historis SCH/UNSCH.
-    const breakdownType = (value?: string): 'scheduled' | 'unscheduled' | null => {
-      const type = String(value || '').trim().toUpperCase().replace(/[\s_-]+/g, ' ');
-      if (['UNSCH', 'UNSCHEDULED', 'BREAKDOWN UNSCHEDULED', 'BUS'].includes(type)) return 'unscheduled';
-      if (['SCH', 'SCHEDULED', 'BREAKDOWN SCHEDULED', 'BS'].includes(type) || type.startsWith('PM')) return 'scheduled';
-      return null;
-    };
     const unschWOs = filteredWOs.filter(w => breakdownType(w.sch_unsch) === 'unscheduled');
     const schWOs = filteredWOs.filter(w => breakdownType(w.sch_unsch) === 'scheduled');
 
-    // Lost Hours Calculation
+    // Lost Hours Calculation (Murni dari data Work Order)
     let totalBDHours = 0;
     let unschHours = 0;
     filteredWOs.forEach(w => {
@@ -115,19 +118,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         unschHours += hrs;
       }
     });
-    if (totalBDHours === 0) totalBDHours = bd * 16;
-    if (unschHours === 0) unschHours = bd * 12;
 
     // MA: Mechanical Availability (MA >= PA)
     const planTotalHours = totalUnits * 24 * 30;
     const schDowntime = Math.max(0, totalBDHours - unschHours);
     const denomMA = Math.max(1, planTotalHours - schDowntime);
-    let ma = Math.round(((planTotalHours - totalBDHours) / denomMA) * 100);
+    let ma = denomMA > 0 ? Math.round(((planTotalHours - totalBDHours) / denomMA) * 100) : 100;
     if (ma < pa) ma = pa;
     if (ma > 100) ma = 100;
-    if (isNaN(ma)) ma = 91;
+    if (isNaN(ma)) ma = 100;
 
     // UA: Utilization of Availability (operating hours / available hours)
+    // Diakumulasi murni dari log Hour Meter (dailyHms)
     let totalOperatingHM = 0;
     dailyHms.forEach(h => {
       const d = String(h.tanggal || '').split('T')[0];
@@ -135,33 +137,46 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         totalOperatingHM += parseFloat(String(h.total_hm)) || 0;
       }
     });
-    if (totalOperatingHM === 0) totalOperatingHM = readyCount * 14 * 25; // standard estimate
 
     const availableHours = Math.max(1, planTotalHours - totalBDHours);
-    let ua = Math.min(100, Math.round((totalOperatingHM / availableHours) * 100));
-    if (isNaN(ua) || ua === 0) ua = 78;
+    const ua = totalOperatingHM > 0 && availableHours > 0
+      ? Math.min(100, Math.round((totalOperatingHM / availableHours) * 100))
+      : 0;
 
     // EU: Effective Utilization (operating hours / total plan hours)
-    let eu = Math.min(100, Math.round((totalOperatingHM / planTotalHours) * 100));
-    if (isNaN(eu) || eu === 0) eu = 72;
+    const eu = totalOperatingHM > 0 && planTotalHours > 0
+      ? Math.min(100, Math.round((totalOperatingHM / planTotalHours) * 100))
+      : 0;
 
     // MTTR: Mean Time to Repair (BUS downtime / jumlah Breakdown Unscheduled)
-    const countUnsch = Math.max(1, unschWOs.length || bd);
-    const mttr = (unschHours / countUnsch).toFixed(1);
+    const countUnsch = unschWOs.length;
+    const mttr = countUnsch > 0 && unschHours > 0
+      ? (unschHours / countUnsch).toFixed(1)
+      : '0.0';
 
     // MTBF: Mean Time Between Failures (Operating hours / Breakdown Count)
-    const mtbf = (totalOperatingHM / countUnsch).toFixed(1);
+    // Jika tidak ada jam operasi (totalOperatingHM === 0) atau tidak ada breakdown, bernilai 0.0h
+    let mtbf = '0.0';
+    if (totalOperatingHM > 0) {
+      mtbf = countUnsch > 0
+        ? (totalOperatingHM / countUnsch).toFixed(1)
+        : totalOperatingHM.toFixed(1);
+    }
 
     // SMRP Backlog Weeks (Open backlogs man-hours / (mechanics * 40h/w))
     const openBacklogs = backlogs.filter(b => (b.status || '').toUpperCase() !== 'CLOSED');
-    const totalBacklogHours = openBacklogs.reduce((acc, b) => acc + (parseFloat(String(b.est_hours)) || 4), 0);
+    const totalBacklogHours = openBacklogs.reduce((acc, b) => acc + (parseFloat(String(b.est_hours)) || 0), 0);
     const totalMechanics = 4;
     const weeklyCapacity = totalMechanics * 40;
-    const backlogWeeks = (totalBacklogHours / weeklyCapacity).toFixed(1);
+    const backlogWeeks = openBacklogs.length > 0 && totalBacklogHours > 0
+      ? (totalBacklogHours / weeklyCapacity).toFixed(1)
+      : '0.0';
 
     // Proactive Maintenance Ratio
-    const totalMaintenanceEvents = Math.max(1, unschWOs.length + schWOs.length);
-    const proactiveRatio = Math.round((schWOs.length / totalMaintenanceEvents) * 100);
+    const totalMaintenanceEvents = unschWOs.length + schWOs.length;
+    const proactiveRatio = totalMaintenanceEvents > 0
+      ? Math.round((schWOs.length / totalMaintenanceEvents) * 100)
+      : 0;
 
     // WO Counts
     const totalWO = filteredWOs.length;
@@ -235,7 +250,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     workOrders.forEach(w => {
       const uNo = (w.no_unit || w.equip_no || '').toUpperCase();
       if (uNo) {
-        hoursMap[uNo] = (hoursMap[uNo] || 0) + (parseFloat(String(w.total_downtime)) || 8);
+        hoursMap[uNo] = (hoursMap[uNo] || 0) + (parseFloat(String(w.total_downtime)) || 0);
       }
     });
     return Object.entries(hoursMap)
@@ -277,18 +292,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const handleExportExcel = () => {
     const rows = [
       ['Kategori Alat', 'No Unit', 'Model', 'Status', 'Plan PA', 'Actual PA', 'Actual MA', 'MTTR (h)', 'MTBF (h)', 'Total BD (h)'],
-      ...equipments.map(eq => [
-        eq.type || 'HEAVY EQUIPMENT',
-        eq.equip_no || eq.no_unit || '-',
-        eq.model || '-',
-        eq.status || 'RFU',
-        '88%',
-        `${metrics.pa}%`,
-        `${metrics.ma}%`,
-        `${metrics.mttr}h`,
-        `${metrics.mtbf}h`,
-        (eq.status || '').toUpperCase().includes('BD') ? '18.5h' : '0.0h'
-      ])
+      ...equipments.map(eq => {
+        const uCode = (eq.equip_no || eq.no_unit || '').toUpperCase();
+        const unitWOs = filteredWOs.filter(w => (w.no_unit || w.equip_no || '').toUpperCase() === uCode);
+        const unitBDHours = unitWOs.reduce((acc: number, w) => acc + (parseFloat(String(w.total_downtime || 0)) || 0), 0);
+        const isBD = (eq.status || '').toUpperCase().includes('BD') || (eq.status || '').toUpperCase().includes('BREAKDOWN');
+        const unitUnschWOs = unitWOs.filter(w => breakdownType(w.sch_unsch) === 'unscheduled');
+        const unitUnschHours = unitUnschWOs.reduce((acc: number, w) => acc + (parseFloat(String(w.total_downtime || 0)) || 0), 0);
+        const unitMTTR = unitUnschWOs.length > 0 && unitUnschHours > 0 ? (unitUnschHours / unitUnschWOs.length).toFixed(1) : '0.0';
+        const unitPA = unitBDHours > 0 ? Math.max(0, Math.round(((720 - unitBDHours) / 720) * 100)) : isBD ? 0 : 100;
+        const unitMA = unitBDHours > 0 ? Math.max(0, Math.round(((720 - unitBDHours) / Math.max(1, 720 - (unitBDHours - unitUnschHours))) * 100)) : isBD ? 0 : 100;
+        return [
+          eq.type || 'HEAVY EQUIPMENT',
+          eq.equip_no || eq.no_unit || '-',
+          eq.model || '-',
+          eq.status || 'RFU',
+          '88%',
+          `${unitPA}%`,
+          `${unitMA}%`,
+          `${unitMTTR}h`,
+          `${metrics.mtbf}h`,
+          `${unitBDHours.toFixed(1)}h`
+        ];
+      })
     ];
 
     const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(e => e.join(',')).join('\n');
@@ -982,6 +1008,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {equipments.map(eq => {
                   const isBD = (eq.status || '').toUpperCase().includes('BD') || (eq.status || '').toUpperCase().includes('BREAKDOWN');
                   const isRWN = (eq.status || '').toUpperCase().includes('RWN') || (eq.status || '').toUpperCase().includes('NOTE');
+                  const uCode = (eq.equip_no || eq.no_unit || '').toUpperCase();
+                  const unitWOs = filteredWOs.filter(w => (w.no_unit || w.equip_no || '').toUpperCase() === uCode);
+                  const unitBDHours = unitWOs.reduce((acc: number, w) => acc + (parseFloat(String(w.total_downtime || 0)) || 0), 0);
+                  const unitUnschWOs = unitWOs.filter(w => breakdownType(w.sch_unsch) === 'unscheduled');
+                  const unitUnschHours = unitUnschWOs.reduce((acc: number, w) => acc + (parseFloat(String(w.total_downtime || 0)) || 0), 0);
+                  const unitMTTR = unitUnschWOs.length > 0 && unitUnschHours > 0 ? (unitUnschHours / unitUnschWOs.length).toFixed(1) : '0.0';
+                  const unitPA = unitBDHours > 0 ? Math.max(0, Math.round(((720 - unitBDHours) / 720) * 100)) : isBD ? 0 : 100;
+                  const unitMA = unitBDHours > 0 ? Math.max(0, Math.round(((720 - unitBDHours) / Math.max(1, 720 - (unitBDHours - unitUnschHours))) * 100)) : isBD ? 0 : 100;
                   return (
                     <tr key={eq.id || eq.equip_no} className="hover:bg-slate-50 transition-colors">
                       <td className="p-3 font-black text-slate-800">{eq.equip_no || eq.no_unit}</td>
@@ -992,23 +1026,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </span>
                       </td>
                       <td className="p-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black text-white ${isBD ? 'bg-red-500' : 'bg-emerald-500'}`}>
-                          {isBD ? '74.2%' : `${metrics.pa}%`}
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black text-white ${unitPA >= 85 ? 'bg-emerald-500' : unitPA >= 70 ? 'bg-amber-500' : 'bg-red-500'}`}>
+                          {unitPA}%
                         </span>
                       </td>
                       <td className="p-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black text-white ${isBD ? 'bg-amber-500' : 'bg-emerald-600'}`}>
-                          {isBD ? '78.5%' : `${metrics.ma}%`}
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black text-white ${unitMA >= 85 ? 'bg-emerald-600' : unitMA >= 70 ? 'bg-amber-500' : 'bg-red-600'}`}>
+                          {unitMA}%
                         </span>
                       </td>
                       <td className="p-3 text-center font-mono font-bold text-red-600">
-                        {isBD ? '6.5h' : '0.0h'}
+                        {unitMTTR}h
                       </td>
                       <td className="p-3 text-center font-mono font-bold text-blue-600">
                         {metrics.mtbf}h
                       </td>
                       <td className="p-3 text-center font-mono font-bold text-slate-700">
-                        {isBD ? '18.5h' : '0.0h'}
+                        {unitBDHours.toFixed(1)}h
                       </td>
                       <td className="p-3 text-center">
                         <span

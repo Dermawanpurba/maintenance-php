@@ -612,14 +612,8 @@ class MaintenanceController extends Controller
             Log::warning('Column self-healing warning: ' . $e->getMessage());
         }
 
-        // 4. Seeder aman jika tabel baru kosong
+        // 4. Seeder aman jika tabel baru kosong (jangan auto-seed data historis agar database bersih tetap bersih)
         try {
-            if (class_exists(\Database\Seeders\OilSampleSeeder::class) && Schema::hasTable('oil_samples') && OilSample::count() === 0) {
-                Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\OilSampleSeeder', '--force' => true]);
-            }
-            if (class_exists(\Database\Seeders\BasicMaintenanceHistoricalSeeder::class) && Schema::hasTable('maintenance_weeks') && MaintenanceWeek::count() === 0) {
-                Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\BasicMaintenanceHistoricalSeeder', '--force' => true]);
-            }
             if (class_exists(\Database\Seeders\PartServiceSeeder::class) && Schema::hasTable('part_services') && PartService::count() === 0) {
                 Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\PartServiceSeeder', '--force' => true]);
             }
@@ -676,16 +670,8 @@ class MaintenanceController extends Controller
             Artisan::call('migrate', ['--force' => true, '--no-interaction' => true]);
             $migrateOutput = trim(Artisan::output());
 
-            // Run seeders if tables are empty
+            // Run seeders if tables are empty (jangan auto-seed BasicMaintenanceHistoricalSeeder agar database bersih tetap bersih)
             $seeded = [];
-            if (Schema::hasTable('oil_samples') && OilSample::count() === 0) {
-                Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\OilSampleSeeder', '--force' => true]);
-                $seeded[] = 'OilSampleSeeder';
-            }
-            if (Schema::hasTable('maintenance_weeks') && MaintenanceWeek::count() === 0) {
-                Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\BasicMaintenanceHistoricalSeeder', '--force' => true]);
-                $seeded[] = 'BasicMaintenanceHistoricalSeeder';
-            }
 
             // Get SQLite tables and counts
             $tables = DB::select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
@@ -801,7 +787,7 @@ class MaintenanceController extends Controller
                 $arr['rencana_eksekusi'] = $arr['rencana_eksekusi'] ?? ($arr['rencana'] ?? ($arr['part_required'] ?? ''));
                 $arr['rencana'] = $arr['rencana_eksekusi'];
                 $arr['part_required'] = $arr['rencana_eksekusi'];
-                $arr['est_hours'] = $arr['est_hours'] ?? ($arr['estimated_hours'] ?? 4);
+                $arr['est_hours'] = $arr['est_hours'] ?? ($arr['estimated_hours'] ?? 0);
                 $arr['estimated_hours'] = $arr['est_hours'];
                 $arr['status'] = strtoupper($arr['status'] ?? 'OPEN');
                 return $arr;
@@ -1719,6 +1705,13 @@ class MaintenanceController extends Controller
     public function deletePCR($data)
     {
         $id = is_array($data) ? ($data['id'] ?? $data['pcr_id'] ?? '') : $data;
+        if ($id === 'all' || (is_array($data) && !empty($data['all']))) {
+            PcrComponent::query()->delete();
+            return ['success' => true, 'message' => 'Seluruh data PCR berhasil dihapus'];
+        }
+        if (empty($id)) {
+            return ['success' => false, 'message' => 'ID PCR tidak valid'];
+        }
         PcrComponent::where('item_id', $id)->orWhere('id', $id)->delete();
         return ['success' => true, 'message' => 'PCR component berhasil dihapus'];
     }
@@ -2183,15 +2176,9 @@ class MaintenanceController extends Controller
                 $eq->update(['last_hm' => $hm]);
             }
 
-            // Fallback pace harian jika belum ada log atau log = 0
+            // Pace harian dihitung dari catatan Daily HM riil (jika belum ada log, pace = 0)
             if (!$avgPace || $avgPace <= 0) {
-                if (str_contains($section, 'HAULING') || str_starts_with($no, 'DT')) {
-                    $avgPace = 13.5;
-                } elseif (str_starts_with($no, 'EX') || str_starts_with($no, 'DZ')) {
-                    $avgPace = 14.0;
-                } else {
-                    $avgPace = 9.0;
-                }
+                $avgPace = 0;
             }
 
             // Reference base date untuk proyeksi
@@ -2217,8 +2204,8 @@ class MaintenanceController extends Controller
                 for ($d = 1; $d <= $daysInMonth; $d++) {
                     $dailySchedule[$d] = ['jam' => 24, 'type' => 'BD'];
                 }
-            } else {
-                // Unit Operasi (RFU):
+            } elseif ($avgPace > 0) {
+                // Unit Operasi (RFU) hanya diproyeksikan jika memiliki catatan pace operasi harian riil:
                 $rem1 = max(0, $due1 - $hm);
                 $daysToDue1 = max(1, (int)round($rem1 / $avgPace));
                 $d1 = (clone $baseDate)->modify("+{$daysToDue1} days");

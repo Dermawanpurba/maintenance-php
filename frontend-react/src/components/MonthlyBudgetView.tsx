@@ -118,62 +118,21 @@ export const MonthlyBudgetView: React.FC<MonthlyBudgetViewProps> = ({
         }
       }
 
-      // If partsCost was 0 but downtime exists, estimate maintenance labor/service rate
-      if (partsCost === 0) {
-        const dtHours = parseFloat(String(wo.total_downtime || wo.downtime_hours || 0));
-        if (dtHours > 0) {
-          partsCost = dtHours * 250000; // Rp 250k/jam estimasi labor & overhead workshop
-        } else if ((wo.pm_service || '').toUpperCase().includes('PM')) {
-          partsCost = 4500000; // Standar PM 250H flat rate
-        } else {
-          partsCost = 2500000; // Flat minimum inspection & repair
-        }
-      }
-
+      // Only accumulate recorded parts costs (no synthetic labor / flat rate fallbacks)
       total += partsCost;
     });
 
     return total;
   };
 
-  // Planned Budget Heuristic per equipment type if not explicitly stored
+  // Planned Budget per equipment type (0 if not configured)
   const getDefaultUnitBudget = (type: string, lastHm: number = 0): number => {
-    switch (type) {
-      case 'BULLDOZER':
-        return 65000000;
-      case 'EXCAVATOR':
-        return 55000000;
-      case 'DUMP TRUCK':
-        return 35000000;
-      case 'MOTOR GRADER':
-        return 30000000;
-      case 'WHEEL LOADER':
-        return 28000000;
-      default:
-        return 18000000;
-    }
+    return 0;
   };
 
-  // Build Comprehensive Unit-Level Records
+  // Build Comprehensive Unit-Level Records from actual equipments
   const unitRecords = useMemo(() => {
-    const sourceEquips: Equipment[] = equipments.length > 0 ? equipments : [
-      { equip_no: 'DZ-007', no_unit: 'DZ-007', unit_type: 'BULLDOZER', brand: 'CAT', model: 'CAT D8 GC', last_hm: 11858.7, status: 'BREAKDOWN', lokasi: 'Pit 1' },
-      { equip_no: 'DZ-002', no_unit: 'DZ-002', unit_type: 'BULLDOZER', brand: 'ZOOMLION', model: 'ZD-320-3', last_hm: 8398.0, status: 'READY', lokasi: 'Pit 2' },
-      { equip_no: 'DZ-005', no_unit: 'DZ-005', unit_type: 'BULLDOZER', brand: 'SEM', model: 'SEM 822D', last_hm: 4520.0, status: 'READY', lokasi: 'Pit 1' },
-      { equip_no: 'EX-205', no_unit: 'EX-205', unit_type: 'EXCAVATOR', brand: 'CAT', model: 'CAT 320 GX', last_hm: 4330.0, status: 'READY', lokasi: 'Pit 1' },
-      { equip_no: 'EX-302', no_unit: 'EX-302', unit_type: 'EXCAVATOR', brand: 'SANY', model: 'SY330H', last_hm: 3945.5, status: 'READY', lokasi: 'Pit 2' },
-      { equip_no: 'EX-304', no_unit: 'EX-304', unit_type: 'EXCAVATOR', brand: 'SANY', model: 'SY330H', last_hm: 4120.0, status: 'READY', lokasi: 'Pit 2' },
-      { equip_no: 'EX-305', no_unit: 'EX-305', unit_type: 'EXCAVATOR', brand: 'SANY', model: 'SY330H', last_hm: 2940.5, status: 'READY', lokasi: 'Pit 2' },
-      { equip_no: 'EX-311', no_unit: 'EX-311', unit_type: 'EXCAVATOR', brand: 'CAT', model: 'CAT 330 GX', last_hm: 1651.0, status: 'READY', lokasi: 'Pit 1' },
-      { equip_no: 'DT-3011', no_unit: 'DT-3011', unit_type: 'DUMP TRUCK', brand: 'SHACMAN', model: 'F3000', last_hm: 6171.0, status: 'READY', lokasi: 'Hauling' },
-      { equip_no: 'DT-3012', no_unit: 'DT-3012', unit_type: 'DUMP TRUCK', brand: 'SHACMAN', model: 'F3000', last_hm: 5890.0, status: 'READY', lokasi: 'Hauling' },
-      { equip_no: 'DT-3017', no_unit: 'DT-3017', unit_type: 'DUMP TRUCK', brand: 'SHACMAN', model: 'F3000', last_hm: 6420.0, status: 'READY', lokasi: 'Hauling' },
-      { equip_no: 'DT-3018', no_unit: 'DT-3018', unit_type: 'DUMP TRUCK', brand: 'SHACMAN', model: 'F3000', last_hm: 5210.0, status: 'READY', lokasi: 'Hauling' },
-      { equip_no: 'MG-501', no_unit: 'MG-501', unit_type: 'MOTOR GRADER', brand: 'CAT', model: 'CAT 140K', last_hm: 7240.0, status: 'READY', lokasi: 'Road Maint' },
-      { equip_no: 'MG-502', no_unit: 'MG-502', unit_type: 'MOTOR GRADER', brand: 'KOMATSU', model: 'GD705-5', last_hm: 6110.0, status: 'READY', lokasi: 'Road Maint' },
-      { equip_no: 'WL-016', no_unit: 'WL-016', unit_type: 'WHEEL LOADER', brand: 'LIUGONG', model: 'LUGONG T-930', last_hm: 2137.5, status: 'BREAKDOWN', lokasi: 'Stockpile' },
-      { equip_no: 'WL-019', no_unit: 'WL-019', unit_type: 'WHEEL LOADER', brand: 'LIUGONG', model: 'CLG870H', last_hm: 3986.0, status: 'MAINTENANCE', lokasi: 'Stockpile' }
-    ];
+    const sourceEquips: Equipment[] = equipments;
 
     return sourceEquips.map(eq => {
       const eqAny = eq as any;
@@ -309,10 +268,19 @@ export const MonthlyBudgetView: React.FC<MonthlyBudgetViewProps> = ({
       { name: 'Undercarriage & GET Wear Parts', planShare: 0.04, actualMultiplier: 1.15 }
     ];
 
-    const totalBudget = kpis.totalPlan || 500000000;
+    const totalBudget = kpis.totalPlan;
+    if (totalBudget === 0 && kpis.totalActual === 0) {
+      return categories.map(cat => ({
+        category: cat.name,
+        plan: 0,
+        actual: 0,
+        variance: 0,
+        pct: 0
+      }));
+    }
     return categories.map(cat => {
       const plan = Math.round(totalBudget * cat.planShare);
-      const baseRatio = kpis.totalPlan > 0 ? kpis.totalActual / kpis.totalPlan : 0.85;
+      const baseRatio = kpis.totalPlan > 0 ? kpis.totalActual / kpis.totalPlan : 0;
       const actual = Math.round(plan * baseRatio * cat.actualMultiplier);
       const variance = plan - actual;
       const pct = plan > 0 ? Math.round((actual / plan) * 100) : 0;
@@ -334,10 +302,18 @@ export const MonthlyBudgetView: React.FC<MonthlyBudgetViewProps> = ({
       { month: 'Jun 2026', planRate: 0.98, actualRate: 0.96 },
       { month: 'Jul 2026', planRate: 1.00, actualRate: 1.05 },
       { month: 'Agu 2026', planRate: 1.00, actualRate: 0.93 },
-      { month: 'Sep 2026', planRate: 1.00, actualRate: kpis.totalPlan > 0 ? kpis.totalActual / kpis.totalPlan : 0.92 }
+      { month: 'Sep 2026', planRate: 1.00, actualRate: kpis.totalPlan > 0 ? kpis.totalActual / kpis.totalPlan : 0 }
     ];
 
-    const baseBudget = kpis.totalPlan || 500000000;
+    const baseBudget = kpis.totalPlan;
+    if (baseBudget === 0 && kpis.totalActual === 0) {
+      return months.map(m => ({
+        month: m.month,
+        budget: 0,
+        actual: 0,
+        pct: 0
+      }));
+    }
     return months.map(m => {
       const budget = Math.round(baseBudget * m.planRate);
       const actual = Math.round(baseBudget * m.actualRate);

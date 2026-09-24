@@ -1,7 +1,7 @@
 -- phpMyAdmin SQL Dump
 -- Database: `maintenance_v1_erp`
 -- Synchronized by WOSys Sheets Manager
--- Export Date: 2026-09-23 16:48:57
+-- Export Date: 2026-09-24 06:55:32
 
 SET FOREIGN_KEY_CHECKS=0;
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -304,7 +304,7 @@ CREATE TABLE `master_equips` (
 
 -- Dumping data for `master_equips`
 INSERT INTO `master_equips` (`id`, `equip_no`, `brand`, `unit_type`, `warranty_status`, `model`, `serial_no`, `model_engine`, `serial_engine`, `capacity_unit`, `capacity_attachment`, `dimension_unit`, `dimension_attachment`, `rate_power_kw`, `year`, `status`, `location`, `created_at`, `updated_at`, `last_hm`, `model_code`) VALUES
-(1, 'DZ-002', 'ZOOMLION', 'BULLDOZER', 'NON WARRANTY', 'ZOOMLION ZD-320-3', 'ZMTZD062PN0001169', 'CUMMINS NTA855-C360S10', 41326274, '35.044 kg', '11,6 m³', '6.625x4.030x3.725', '4.030x1.705', 257, 2022, 'RFU', 'KBCT', '2026-09-13 08:00:00', '2026-09-21 07:17:22', 8470, 'ZOOMLION_ZD320'),
+(1, 'DZ-002', 'ZOOMLION', 'BULLDOZER', 'NON WARRANTY', 'ZOOMLION ZD-320-3', 'ZMTZD062PN0001169', 'CUMMINS NTA855-C360S10', 41326274, '35.044 kg', '11,6 m³', '6.625x4.030x3.725', '4.030x1.705', 257, 2022, 'B/D', 'KBCT', '2026-09-13 08:00:00', '2026-09-23 12:00:58', 8470, 'ZOOMLION_ZD320'),
 (2, 'DZ-005', 'SEM', 'BULLDOZER', 'NON WARRANTY', 'SEM 822D', 'SEM00822VS8T00933', 'WEICHAI WD12G240E206', '1122S001731', '24.000 kg', '6,4 m³', '5.845x3.660x3.170', '3.660x1.520', 175, 2022, 'READY', 'KBCT', '2026-09-13 08:00:00', '2026-09-21 06:51:26', 7341.5, 'SEM_822D'),
 (3, 'DZ-069', 'ZOOMLION', 'BULLDOZER', 'NON WARRANTY', 'ZOOMLION ZD-220-3', 'ZMTZD030TN0005482', 'CUMMINS NTA855-C280', 41331692, '23.600 kg', '6,4 m³', '5.460x3.725x3.395', '3.725x1.315', 175, 2022, 'READY', 'KBCT', '2026-09-13 08:00:00', '2026-09-21 06:51:26', 6984, 'ZOOMLION_ZD220'),
 (4, 'DZ-007', 'CATERPILLAR', 'BULLDOZER', 'NON WARRANTY', 'CAT D8 GC', 'CAT000D8LKGX00408', 'CAT 3406C', 'TXJ02310', '37.000 kg', '0,93 m³', '', '', 130, 2022, 'RFU', 'KBCT', '2026-09-13 08:00:00', '2026-09-21 06:51:26', 11877.2, 'CAT_D8GC'),
@@ -579,6 +579,92 @@ CREATE TABLE `part_services` (
   `model_code` text DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for `part_services`
+INSERT INTO `part_services` (`id`, `equipment`, `model`, `unit_type`, `part_name`, `part_number`, `ps_250`, `ps_500`, `ps_1000`, `ps_2000`, `ps_4000`, `category`, `notes`, `created_at`, `updated_at`, `model_code`) VALUES
+(1, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'ENGINE OIL', 'SAE 15W-40', NULL, 13, 13, 13, 13, 'Lubricant & Oil', 'Oli mesin pelumas utama diesel', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(2, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'OIL TRANSMISI', 'SAE 80W-90', NULL, 9, 9, 9, 9, 'Lubricant & Oil', 'Gearbox transmission fluid', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(3, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'OIL TRANSMISI', 'SAE 80W-90', NULL, 22, 22, 22, 22, 'Lubricant & Oil', 'Pelumas transfer case & auxiliary', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(4, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'OIL DIFFERENTIAL', 'SAE 80W-140', NULL, 22, 22, 22, 22, 'Lubricant & Oil', 'Gardan tandem gardan belakang', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(5, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'STEERING HYDRAULIC OIL', 'ATF Dexron III', NULL, NULL, NULL, NULL, 2, 'Lubricant & Oil', 'Minyak power steering kemudi', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(6, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'HYDRAULIC OIL', 'ISO VG 46', NULL, NULL, 5, 5, 15, 'Lubricant & Oil', 'Oli hidrolik dump hoist cylinder', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(7, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'ENGINE OIL FILTER', 'ME130968IDN', NULL, 1, 1, 1, 1, 'Filter', 'Saringan oli mesin utama', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(8, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'FUEL FILTER', 'KM005852', 1, 1, 1, 1, 1, 'Filter', 'Saringan bahan bakar solar', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(9, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'FILTER RACOR', 'KM005035', 1, 1, 1, 1, 1, 'Filter', 'Pemisah air solar Racor water separator', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(10, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'FUEL FILTER', 'KM006110A1', 1, 1, 1, 1, 1, 'Filter', 'Saringan solar sekunder', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(11, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'AIR CLEANER OUTER', 'ME073821IDN', NULL, NULL, 1, 1, 1, 'Filter', 'Saringan udara primer luar', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(12, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'AIR CLEANER INNER', 'ME291563IDN', NULL, NULL, 1, 1, 1, 'Filter', 'Saringan udara pengaman dalam', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(13, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'FILTER STEERING', 'MC090385', NULL, NULL, 1, 1, 1, 'Filter', 'Filter oli power steering', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(14, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'ELEMENT KIT,PCV VALVE', 'ME302763', NULL, NULL, NULL, NULL, 1, 'Engine Parts', 'Katup ventilasi karter mesin', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(15, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'FAN BELT ALTERNATOR', 'ME300899IDN', NULL, NULL, NULL, 3, 3, 'Belt & Drive', 'Tali kipas alternator & kipas mesin (3 pcs)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(16, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'FAN AC', 'A-39', NULL, NULL, 1, 1, 1, 'Belt & Drive', 'Tali v-belt kompresor pendingin AC kabin', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(17, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'BOTTLE SAMPLE OIL ENGINE', 'HP-427', NULL, 1, 1, 1, 1, 'Consumable & Lab', 'Botol uji lab oli mesin SOS (Scheduled Oil Sampling)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(18, 'DUMP TRUCK 10 RODA', 'FUSO FIGHTER FN62', 'DT', 'BOTTLE SAMPLE OIL NON ENGINE', 'HP-426', NULL, NULL, 1, 1, 1, 'Consumable & Lab', 'Botol uji lab oli transmisi/differential SOS', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(19, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'ENGINE OIL WEICHAI WP12', 'SAE 15W-40 CI-4', 32, 32, 32, 32, 32, 'Lubricant & Oil', 'Kapasitas carter oli mesin WP12 (32 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(20, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'TRANSMISSION OIL FAST GEAR', 'SAE 85W-90 GL-5', NULL, 14, 14, 14, 14, 'Lubricant & Oil', 'Oli gearbox Fast 12JSD160T (14 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(21, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'DIFFERENTIAL OIL REAR TANDEM', 'SAE 85W-140 GL-5', NULL, 28, 28, 28, 28, 'Lubricant & Oil', 'Oli gardan tandem MAN 16T (14L + 14L)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(22, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'STEERING & HOIST HYDRAULIC OIL', 'ISO VG 46 / ATF', NULL, NULL, 24, 24, 24, 'Lubricant & Oil', 'Oli silinder dump hoist & power steering', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(23, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'ENGINE OIL FILTER WEICHAI', 61000070005, 1, 1, 1, 1, 1, 'Filter', 'Filter oli mesin Weichai asli', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(24, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'FUEL FILTER PRIMARY WATER SEPARATOR', 612600081335, 1, 1, 1, 1, 1, 'Filter', 'Filter solar primer pemisah air', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(25, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'FUEL FILTER SECONDARY FINE', 612600081334, 1, 1, 1, 1, 1, 'Filter', 'Filter solar sekunder halus', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(26, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'AIR CLEANER OUTER PRIMARY', 'DZ9118190230', NULL, 1, 1, 1, 1, 'Filter', 'Saringan udara luar tabung besar', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(27, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'AIR CLEANER INNER SAFETY', 'DZ9118190231', NULL, NULL, 1, 1, 1, 'Filter', 'Saringan udara dalam pengaman', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(28, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'FAN BELT ALTERNATOR 8PK', '8PK1440', NULL, NULL, NULL, 1, 1, 'Belt & Drive', 'Tali kipas alternator serpentine belt', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(29, 'DUMP TRUCK', 'SHACMAN F3000', 'DT', 'BOTTLE SAMPLE OIL ENGINE SOS', 'HP-427', NULL, 1, 1, 1, 1, 'Consumable & Lab', 'Botol uji laboratorium SOS oli mesin', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(30, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'ENGINE OIL CAT C7.1', 'SAE 15W-40 CK-4', 32, 32, 32, 32, 32, 'Lubricant & Oil', 'Kapasitas oli carter mesin C7.1 ACERT (32 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(31, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'ENGINE OIL FILTER ULTRA HIGH EFFICIENCY', '1R-1808', 1, 1, 1, 1, 1, 'Filter', 'Filter oli mesin efisiensi tinggi Cat Asli', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(32, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'FUEL FILTER PRIMARY (WATER SEPARATOR)', '326-1644', 1, 1, 1, 1, 1, 'Filter', 'Pemisah air solar dengan mangkok drain', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(33, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'FUEL FILTER SECONDARY', '1R-0770', NULL, 1, 1, 1, 1, 'Filter', 'Filter solar sekunder presisi 4 micron', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(34, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'HYDRAULIC OIL HIGH PRESSURE', 'ISO VG 46 / HYDO ADVANCED', NULL, NULL, NULL, 280, 280, 'Lubricant & Oil', 'Kuras total oli hidrolik tangki dan sistem kerja (280 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(35, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'HYDRAULIC PILOT FILTER', '093-7521', NULL, 1, 1, 1, 1, 'Filter', 'Filter sirkuit joystick pilot control', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(36, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'HYDRAULIC RETURN FILTER', '126-1817', NULL, 1, 1, 1, 1, 'Filter', 'Filter oli hidrolik balik ke tangki', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(37, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'SWING MACHINERY GEAR OIL', 'SAE 85W-140', NULL, NULL, 14, 14, 14, 'Lubricant & Oil', 'Pelumas gearbox swing drive unit (14 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(38, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'FINAL DRIVE TRAVEL GEAR OIL', 'SAE 85W-140', NULL, NULL, 18, 18, 18, 'Lubricant & Oil', 'Pelumas travel final drive kiri & kanan (9L + 9L)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(39, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'AIR CLEANER OUTER', '245-6375', NULL, 1, 1, 1, 1, 'Filter', 'Elemen saringan udara luar', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(40, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'AIR CLEANER INNER', '245-6376', NULL, NULL, 1, 1, 1, 'Filter', 'Elemen pengaman saringan udara dalam', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(41, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'AIR CONDITIONER FILTER CABIN', '293-1184', NULL, NULL, 1, 1, 1, 'Filter', 'Filter sirkulasi AC kabin operator', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(42, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'BOTTLE SAMPLE OIL ENGINE SOS', 'HP-427', NULL, 1, 1, 1, 1, 'Consumable & Lab', 'Botol uji laboratorium SOS oli mesin', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(43, 'EXCAVATOR', 'CAT 320 GX / 330 GX', 'EXCA', 'BOTTLE SAMPLE OIL HYDRAULIC SOS', 'HP-426', NULL, NULL, 1, 1, 1, 'Consumable & Lab', 'Botol uji laboratorium SOS oli hidrolik', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(44, 'EXCAVATOR', 'SANY SY330H', 'EXCA', 'ENGINE OIL ISUZU 6HK1', 'SAE 15W-40 CI-4', 36, 36, 36, 36, 36, 'Lubricant & Oil', 'Kapasitas oli carter mesin Isuzu 6HK1 (36 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(45, 'EXCAVATOR', 'SANY SY330H', 'EXCA', 'ENGINE OIL FILTER SANY', 60133177, 1, 1, 1, 1, 1, 'Filter', 'Filter oli mesin Sany genuine', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(46, 'EXCAVATOR', 'SANY SY330H', 'EXCA', 'FUEL PRE-FILTER WATER SEPARATOR', 60031766, 1, 1, 1, 1, 1, 'Filter', 'Filter solar primer pemisah air', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(47, 'EXCAVATOR', 'SANY SY330H', 'EXCA', 'FUEL FINE FILTER MAIN', 60031767, NULL, 1, 1, 1, 1, 'Filter', 'Filter solar sekunder halus', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(48, 'EXCAVATOR', 'SANY SY330H', 'EXCA', 'HYDRAULIC RETURN FILTER SANY', 60036814, NULL, 1, 1, 1, 1, 'Filter', 'Filter oli hidrolik tangki balik', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(49, 'EXCAVATOR', 'SANY SY330H', 'EXCA', 'AIR CLEANER OUTER', 60134444, NULL, 1, 1, 1, 1, 'Filter', 'Saringan udara primer luar', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(50, 'EXCAVATOR', 'SANY SY330H', 'EXCA', 'AIR CLEANER INNER', 60134445, NULL, NULL, 1, 1, 1, 'Filter', 'Saringan udara pengaman dalam', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(51, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'ENGINE OIL CAT 3406C', 'SAE 15W-40 CK-4', 38, 38, 38, 38, 38, 'Lubricant & Oil', 'Kapasitas oli mesin Cat 3406C / C15 (38 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(52, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'ENGINE OIL FILTER CAT (2 PCS)', '1R-0716', 2, 2, 2, 2, 2, 'Filter', 'Filter oli mesin ganti 2 buah per servis', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(53, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'FUEL FILTER PRIMARY (WATER SEPARATOR)', '1R-0770', 1, 1, 1, 1, 1, 'Filter', 'Pemisah air bahan bakar solar primer', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(54, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'FUEL FILTER SECONDARY', '1R-0749', NULL, 1, 1, 1, 1, 'Filter', 'Saringan bahan bakar solar halus 2 micron', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(55, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'TRANSMISSION & TORQFLOW OIL', 'TO-4 SAE 30', NULL, NULL, 120, 120, 120, 'Lubricant & Oil', 'Kuras total oli transmisi power shift torqflow (120L)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(56, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'TRANSMISSION FILTER', '1G-8878', NULL, 1, 1, 1, 1, 'Filter', 'Filter pelumasan transmisi torqflow', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(57, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'FINAL DRIVE OIL (LH/RH)', 'TO-4 SAE 50', NULL, NULL, 68, 68, 68, 'Lubricant & Oil', 'Kuras oli final drive kiri dan kanan (34L + 34L)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(58, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'BEVEL GEAR & STEERING CLUTCH OIL', 'TO-4 SAE 30', NULL, NULL, 95, 95, 95, 'Lubricant & Oil', 'Pelumas rumah gigi kerucut & kopling kemudi (95L)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(59, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'HYDRAULIC OIL (BLADE & RIPPER)', 'ISO VG 46 / HYDO', NULL, NULL, NULL, 110, 110, 'Lubricant & Oil', 'Kuras total oli hidrolik silinder blade & ripper', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(60, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'HYDRAULIC RETURN FILTER', '1R-0777', NULL, 1, 1, 1, 1, 'Filter', 'Filter sirkulasi balik tangki hidrolik', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(61, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'AIR CLEANER OUTER', '4N-0015', NULL, 1, 1, 1, 1, 'Filter', 'Saringan udara primer luar', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(62, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'AIR CLEANER INNER', '4N-0016', NULL, NULL, 1, 1, 1, 'Filter', 'Saringan udara pengaman dalam', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(63, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'FAN BELT SET', '9L-6644', NULL, NULL, NULL, 1, 1, 'Belt & Drive', 'Tali kipas pendingin radiator set', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(64, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'BOTTLE SAMPLE OIL ENGINE SOS', 'HP-427', NULL, 1, 1, 1, 1, 'Consumable & Lab', 'Botol uji lab oli mesin SOS', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(65, 'BULLDOZER', 'CAT D8 GC', 'DOZER', 'BOTTLE SAMPLE OIL TRANSMISI SOS', 'HP-426', NULL, 1, 1, 1, 1, 'Consumable & Lab', 'Botol uji lab oli transmisi torqflow SOS', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(66, 'BULLDOZER', 'SEM 822D', 'DOZER', 'ENGINE OIL WEICHAI WP12', 'SAE 15W-40 CI-4', 34, 34, 34, 34, 34, 'Lubricant & Oil', 'Kapasitas oli carter mesin Weichai WP12 (34 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(67, 'BULLDOZER', 'SEM 822D', 'DOZER', 'ENGINE OIL FILTER', 'W950/31', 1, 1, 1, 1, 1, 'Filter', 'Filter oli mesin utama', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(68, 'BULLDOZER', 'SEM 822D', 'DOZER', 'FUEL PRE-FILTER WATER SEPARATOR', 'PL420', 1, 1, 1, 1, 1, 'Filter', 'Filter solar primer dengan sensor air', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(69, 'BULLDOZER', 'SEM 822D', 'DOZER', 'HYDROSTATIC HYDRAULIC OIL', 'ISO VG 46 / 68', NULL, NULL, NULL, 140, 140, 'Lubricant & Oil', 'Kuras oli sistem penggerak hidrostatis ganda', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(70, 'BULLDOZER', 'SEM 822D', 'DOZER', 'HYDROSTATIC HIGH PRESSURE FILTER', 'W-15-00040', NULL, 1, 1, 1, 1, 'Filter', 'Filter oli hidrostatis tekanan tinggi', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(71, 'BULLDOZER', 'ZOOMLION ZD-320-3', 'DOZER', 'ENGINE OIL CUMMINS NTA855', 'SAE 15W-40 CI-4', 45, 45, 45, 45, 45, 'Lubricant & Oil', 'Kapasitas oli carter Cummins NTA855 (45 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(72, 'BULLDOZER', 'ZOOMLION ZD-320-3', 'DOZER', 'ENGINE OIL FILTER (2 PCS)', 'LF9009', 2, 2, 2, 2, 2, 'Filter', 'Filter oli mesin kombinasi bypass Cummins', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(73, 'BULLDOZER', 'ZOOMLION ZD-320-3', 'DOZER', 'FUEL FILTER WATER SEPARATOR', 'FS1000', 1, 1, 1, 1, 1, 'Filter', 'Filter solar primer pemisah air Fleetguard', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(74, 'WHEEL LOADER', 'SEM 660D', 'LOADER', 'ENGINE OIL WEICHAI WP10', 'SAE 15W-40 CI-4', 22, 22, 22, 22, 22, 'Lubricant & Oil', 'Kapasitas oli carter mesin loader 6 ton (22 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(75, 'WHEEL LOADER', 'SEM 660D', 'LOADER', 'ENGINE OIL FILTER', 1000424655, 1, 1, 1, 1, 1, 'Filter', 'Filter oli mesin Weichai', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(76, 'WHEEL LOADER', 'SEM 660D', 'LOADER', 'FUEL FILTER PRIMARY', 612600081335, 1, 1, 1, 1, 1, 'Filter', 'Filter solar primer pemisah air', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(77, 'WHEEL LOADER', 'SEM 660D', 'LOADER', 'TRANSMISSION TORQUE CONVERTER OIL', 'TO-4 SAE 30', NULL, NULL, 45, 45, 45, 'Lubricant & Oil', 'Oli transmisi powershift TR200', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(78, 'WHEEL LOADER', 'SEM 660D', 'LOADER', 'HYDRAULIC OIL (BUCKET & STEERING)', 'ISO VG 46', NULL, NULL, NULL, 170, 170, 'Lubricant & Oil', 'Kuras total tangki oli hidrolik bucket (170 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(79, 'WATER TRUCK 20.000 KL', 'QUESTER CWE 280', 'SUPPORT', 'ENGINE OIL UD TRUCKS GH8E', 'SAE 15W-40 CI-4', 28, 28, 28, 28, 28, 'Lubricant & Oil', 'Kapasitas oli carter mesin GH8E (28 Liter)', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(80, 'WATER TRUCK 20.000 KL', 'QUESTER CWE 280', 'SUPPORT', 'ENGINE OIL FILTER', 21707133, 1, 1, 1, 1, 1, 'Filter', 'Filter oli mesin utama UD Trucks', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(81, 'WATER TRUCK 20.000 KL', 'QUESTER CWE 280', 'SUPPORT', 'FUEL PRE-FILTER WATER SEPARATOR', 20998367, 1, 1, 1, 1, 1, 'Filter', 'Pemisah air bahan bakar solar primer', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(82, 'WATER TRUCK 20.000 KL', 'QUESTER CWE 280', 'SUPPORT', 'FUEL FINE FILTER SECONDARY', 21380475, NULL, 1, 1, 1, 1, 'Filter', 'Filter solar sekunder halus', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL),
+(83, 'WATER TRUCK 20.000 KL', 'QUESTER CWE 280', 'SUPPORT', 'AIR CLEANER OUTER', 21834205, NULL, 1, 1, 1, 1, 'Filter', 'Saringan udara primer luar', '2026-09-23 10:00:33', '2026-09-23 10:00:33', NULL);
 
 -- --------------------------------------------------------
 -- Table structure for `password_reset_tokens`

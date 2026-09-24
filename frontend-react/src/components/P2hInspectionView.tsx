@@ -305,54 +305,7 @@ export const P2hInspectionView: React.FC<P2hInspectionViewProps> = ({
   };
 
   // Local sample history jika inspections dari props belum ada
-  const [localHistory, setLocalHistory] = useState<Array<any>>([
-    {
-      id: 'INSP-101',
-      equip_no: 'EX1210',
-      tipe_alat: 'EXCAVATOR',
-      tanggal: '2026-09-18',
-      shift: 'Shift 1',
-      inspector: 'Suhartono (Operator)',
-      result: 'RFU',
-      status: 'RFU',
-      fail_count: 0,
-      warning_count: 0,
-      items: excavatorChecklist.map(c => ({ ...c, status: 'PASS', note: 'Kondisi Baik' })),
-      catatan: 'Unit Excavator layak operasi pit tanpa kendala.'
-    },
-    {
-      id: 'INSP-102',
-      equip_no: 'DZ-007',
-      tipe_alat: 'DOZER',
-      tanggal: '2026-09-17',
-      shift: 'Shift 2',
-      inspector: 'Budi Santoso',
-      result: 'RWN',
-      status: 'RWN',
-      fail_count: 0,
-      warning_count: 1,
-      items: dozerChecklist.map((c, i) => ({ 
-        ...c, 
-        status: i === 1 ? 'WARNING' : 'PASS', 
-        note: i === 1 ? 'Rembes minor hose silinder blade tilt' : 'Normal' 
-      })),
-      catatan: 'Perlu pengencangan fitting hose hidrolik blade tilt saat pergantian shift.'
-    },
-    {
-      id: 'INSP-103',
-      equip_no: 'DT230',
-      tipe_alat: 'DUMP_TRUCK',
-      tanggal: '2026-09-16',
-      shift: 'Shift 1',
-      inspector: 'Ahmad Dani',
-      result: 'RFU',
-      status: 'RFU',
-      fail_count: 0,
-      warning_count: 0,
-      items: dumpTruckChecklist.map(c => ({ ...c, status: 'PASS', note: 'Normal' })),
-      catatan: 'Tekanan ban dan retarder brake prima untuk hauling batubara.'
-    }
-  ]);
+  const [localHistory, setLocalHistory] = useState<Array<any>>([]);
 
   // Gabungkan history dari props (backend) dan local
   const combinedHistory = useMemo(() => {

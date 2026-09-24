@@ -39,7 +39,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
     equip_no: equipments[0]?.equip_no || equipments[0]?.no_unit || '',
     deskripsi_backlog: '',
     rencana_eksekusi: '',
-    est_hours: 4,
+    est_hours: 0,
     status: 'OPEN'
   });
 
@@ -52,8 +52,8 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
     });
     const openCount = openBacklogs.length;
     const totalManHours = openBacklogs.reduce((sum, b) => {
-      const h = parseFloat(String(b.est_hours || b.estimated_hours || 4));
-      return sum + (isNaN(h) ? 4 : h);
+      const h = parseFloat(String(b.est_hours ?? b.estimated_hours ?? 0));
+      return sum + (isNaN(h) ? 0 : h);
     }, 0);
 
     const totalMechanics = 4;
@@ -63,7 +63,10 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
 
     let healthLabel = 'SEHAT (2-4 MINGGU)';
     let healthBg = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    if (bwNum < 2) {
+    if (openCount === 0 || totalManHours === 0) {
+      healthLabel = 'NIHIL / KOSONG (0 MINGGU)';
+      healthBg = 'bg-slate-50 text-slate-600 border-slate-200';
+    } else if (bwNum < 2) {
       healthLabel = 'LOW WORKLOAD (<2 MINGGU)';
       healthBg = 'bg-blue-50 text-blue-700 border-blue-200';
     } else if (bwNum > 4 && bwNum <= 6) {
@@ -158,7 +161,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
         deskripsi: desc,
         rencana_eksekusi: form.rencana_eksekusi || '',
         rencana: form.rencana_eksekusi || '',
-        est_hours: form.est_hours || 4,
+        est_hours: form.est_hours !== undefined ? Number(form.est_hours) : 0,
         status: form.status || 'OPEN'
       });
 
@@ -169,7 +172,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
           equip_no: equipments[0]?.equip_no || equipments[0]?.no_unit || '',
           deskripsi_backlog: '',
           rencana_eksekusi: '',
-          est_hours: 4,
+          est_hours: 0,
           status: 'OPEN'
         });
         onRefresh();
@@ -363,9 +366,9 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
 
                   const equipNo = bl.equip_no || bl.no_unit || '-';
                   const itemId = bl.item_id || bl.id || `BL-${idx + 1}`;
-                  const desc = bl.deskripsi_backlog || bl.deskripsi || 'Data deskripsi temuan defect';
-                  const rencana = bl.rencana_eksekusi || bl.rencana || bl.part_required || 'Servis periodik berikutnya';
-                  const estH = parseFloat(String(bl.est_hours || bl.estimated_hours || 4)) || 4;
+                  const desc = bl.deskripsi_backlog || bl.deskripsi || '-';
+                  const rencana = bl.rencana_eksekusi || bl.rencana || bl.part_required || '-';
+                  const estH = parseFloat(String(bl.est_hours ?? bl.estimated_hours ?? 0)) || 0;
 
                   return (
                     <tr key={bl.id || bl.item_id || idx} className="hover:bg-slate-50/80 transition-colors">
@@ -534,10 +537,10 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
                   <input
                     type="number"
                     step="0.5"
-                    min="0.5"
+                    min="0"
                     max="100"
-                    value={form.est_hours || form.estimated_hours || 4}
-                    onChange={e => setForm({ ...form, est_hours: parseFloat(e.target.value) || 4 })}
+                    value={form.est_hours ?? 0}
+                    onChange={e => setForm({ ...form, est_hours: parseFloat(e.target.value) || 0 })}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 outline-none focus:border-amber-500 font-mono font-bold"
                   />
                 </div>

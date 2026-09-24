@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
             MaintenanceDatabaseSeeder::class,
             SampleDataSeeder::class,
             OilSampleSeeder::class,
-            BasicMaintenanceHistoricalSeeder::class,
+            // BasicMaintenanceHistoricalSeeder::class, // Dipisahkan agar tidak otomatis menginjeksi periode minggu dummy (WEEK 36-38)
         ]);
     }
 }

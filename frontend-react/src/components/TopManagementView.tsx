@@ -103,15 +103,12 @@ export const TopManagementView: React.FC<TopManagementViewProps> = ({
     filteredWOs.forEach(w => {
       if (w.total_downtime) {
         totalDowntimeHours += parseFloat(String(w.total_downtime)) || 0;
-      } else if ((w.status || '').toUpperCase() !== 'CLOSED') {
-        totalDowntimeHours += 12; // default estimated active downtime
       }
     });
-    if (totalDowntimeHours === 0) {
-      totalDowntimeHours = bd * 18.5;
-    }
 
-    const mttr = bdWOs.length > 0 ? (totalDowntimeHours / Math.max(1, bdWOs.length)).toFixed(1) : '4.5';
+    const mttr = bdWOs.length > 0 && totalDowntimeHours > 0
+      ? (totalDowntimeHours / bdWOs.length).toFixed(1)
+      : '0.0';
 
     return {
       totalUnits,
@@ -145,7 +142,7 @@ export const TopManagementView: React.FC<TopManagementViewProps> = ({
           equip_no: eq.equip_no || eq.no_unit || 'UNKNOWN',
           model: eq.model || eq.type || 'HEAVY EQUIPMENT',
           kendala: matchingWO?.deskripsi || eq.keterangan || 'Menunggu tindakan korektif breakdown',
-          downtime: matchingWO?.total_downtime ? `${matchingWO.total_downtime}h` : '18.5h',
+          downtime: matchingWO?.total_downtime ? `${matchingWO.total_downtime}h` : '-',
           status: matchingWO?.status || eq.status || 'B/D'
         };
       });
@@ -173,23 +170,28 @@ export const TopManagementView: React.FC<TopManagementViewProps> = ({
 
   // Major component breakdown for Chart 3
   const majorComponents = useMemo(() => {
-    const compMap: Record<string, number> = {
-      'HYDRAULIC SYSTEM': 34.5,
-      'ENGINE & COOLING': 28.0,
-      'UNDERCARRIAGE': 18.5,
-      'TRANSMISSION': 14.0,
-      'ELECTRICAL / SENSOR': 9.5
-    };
-    workOrders.forEach(w => {
+    const compMap: Record<string, number> = {};
+    const filteredWOs = workOrders.filter(w => {
+      const tgl = w.tgl_rusak || w.tanggal;
+      if (!tgl) return true;
+      const d = String(tgl).split('T')[0];
+      return d >= startDate && d <= endDate;
+    });
+
+    filteredWOs.forEach(w => {
       if (w.major_comp) {
-        const mc = String(w.major_comp).toUpperCase();
-        compMap[mc] = (compMap[mc] || 0) + (parseFloat(String(w.total_downtime)) || 8);
+        const mc = String(w.major_comp).trim().toUpperCase();
+        if (mc) {
+          const dt = parseFloat(String(w.total_downtime || 0)) || 0;
+          compMap[mc] = (compMap[mc] || 0) + dt;
+        }
       }
     });
     return Object.entries(compMap)
+      .filter(([_, hrs]) => hrs > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
-  }, [workOrders]);
+  }, [workOrders, startDate, endDate]);
 
   // Latest Meeting Note
   const latestMeeting = useMemo(() => {
@@ -706,26 +708,34 @@ export const TopManagementView: React.FC<TopManagementViewProps> = ({
           </div>
 
           <div className="h-60 flex flex-col justify-center space-y-3.5">
-            {majorComponents.map(([comp, hrs], idx) => {
-              const maxHrs = majorComponents[0][1] || 1;
-              const pct = (hrs / maxHrs) * 100;
-              return (
-                <div key={comp} className="space-y-1">
-                  <div className="flex justify-between text-[11px] font-bold text-slate-700">
-                    <span className="truncate pr-2 text-[10px] uppercase font-bold text-slate-600">
-                      #{idx + 1} {comp}
-                    </span>
-                    <span className="text-red-500 font-mono text-xs">{hrs.toFixed(1)} Jam</span>
+            {majorComponents.length > 0 ? (
+              majorComponents.map(([comp, hrs], idx) => {
+                const maxHrs = majorComponents[0]?.[1] || 1;
+                const pct = maxHrs > 0 ? (hrs / maxHrs) * 100 : 0;
+                return (
+                  <div key={comp} className="space-y-1">
+                    <div className="flex justify-between text-[11px] font-bold text-slate-700">
+                      <span className="truncate pr-2 text-[10px] uppercase font-bold text-slate-600">
+                        #{idx + 1} {comp}
+                      </span>
+                      <span className="text-red-500 font-mono text-xs">{hrs.toFixed(1)} Jam</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="bg-red-500 h-full rounded-full transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                    <div
-                      className="bg-red-500 h-full rounded-full transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <div className="text-center text-xs text-slate-400 py-10 flex flex-col items-center justify-center gap-1.5">
+                <CheckCircle2 className="w-6 h-6 text-emerald-500 mb-0.5 opacity-80" />
+                <span className="font-bold text-slate-600">Tidak Ada Jam Rusak (0 Jam)</span>
+                <span className="text-[10px] text-slate-400">Semua komponen normal / belum ada data kerusakan tercatat</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

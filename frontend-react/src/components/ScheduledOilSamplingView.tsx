@@ -80,17 +80,17 @@ export const ScheduledOilSamplingView: React.FC<ScheduledOilSamplingViewProps> =
     if (eq) {
       return {
         ...eq,
-        model: eq.model || (selectedUnit === 'EX1210' ? 'PC1250-8R' : selectedUnit === 'DT230' ? 'HD785-7' : selectedUnit === 'DZ850' ? 'D375A-6' : 'Heavy Equipment'),
-        last_hm: eq.last_hm || (selectedUnit === 'EX1210' ? 47006 : selectedUnit === 'DT230' ? 23150 : 18420)
+        model: eq.model || 'Heavy Equipment',
+        last_hm: Number(eq.last_hm || 0)
       };
     }
     return {
       no_unit: selectedUnit,
       equip_no: selectedUnit,
-      model: selectedUnit === 'EX1210' ? 'PC1250-8R' : selectedUnit === 'DT230' ? 'HD785-7' : selectedUnit === 'DZ850' ? 'D375A-6' : 'Heavy Equipment',
-      lokasi: 'Pit A (Production)',
+      model: 'Heavy Equipment',
+      lokasi: 'Site Plant',
       status: 'READY',
-      last_hm: selectedUnit === 'EX1210' ? 47006 : selectedUnit === 'DT230' ? 23150 : 18420
+      last_hm: 0
     };
   }, [equipments, selectedUnit]);
 
@@ -101,7 +101,7 @@ export const ScheduledOilSamplingView: React.FC<ScheduledOilSamplingViewProps> =
     equip_no: selectedUnit,
     compartment: 'Engine',
     sample_date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-'),
-    hm: 47006,
+    hm: 0,
     oil_grade: '15W-40',
     rating: 'A',
     top_up: 0,
@@ -258,27 +258,27 @@ export const ScheduledOilSamplingView: React.FC<ScheduledOilSamplingViewProps> =
       equip_no: selectedUnit,
       compartment: presetComp || 'Engine',
       sample_date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-'),
-      hm: Number(currentEquip.last_hm) || 47006,
+      hm: Number(currentEquip.last_hm) || 0,
       oil_grade: presetComp === 'Hydraulic System' ? 'TELLUS 46' : presetComp?.includes('Final Drive') ? 'SAE 30' : '15W-40',
       rating: 'A',
       top_up: 0,
       repair_notes: '',
-      si: 2,
+      si: 0,
       al: 0,
       na: 0,
       fe: 0,
-      cu: 45015,
-      cr: 3,
-      pb: 5,
+      cu: 0,
+      cr: 0,
+      pb: 0,
       pq: 0,
       visc_100: 0,
       oxi: 0,
       soot: 0,
       tbn: 0,
       iso_6: 0,
-      iso_14: presetComp === 'Hydraulic System' ? 3801 : 0,
+      iso_14: 0,
       water_pct: 0,
-      interpretation: 'All Test Results Appear Acceptable. Take Oil Samples At 250 Hour Intervals To Monitor Condition.',
+      interpretation: 'Normal inspection.',
       lab_vendor: 'Caterpillar SOS Lab'
     });
     setIsModalOpen(true);
