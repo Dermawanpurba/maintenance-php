@@ -29,6 +29,7 @@ import { PpuView } from './components/PpuView';
 import { TargetJamOperasiView } from './components/TargetJamOperasiView';
 import { PartServiceView } from './components/PartServiceView';
 import { PlanningPartServiceView } from './components/PlanningPartServiceView';
+import { PsScheduleServiceView } from './components/PsScheduleServiceView';
 import { printExecutiveReport } from './utils/printUtils';
 import { api } from './services/api';
 import {
@@ -56,7 +57,8 @@ import {
   PpuRecord,
   TargetJamOperasi,
   TargetJamHarian,
-  PartServiceItem
+  PartServiceItem,
+  PsScheduleItem
 } from './types';
 import { RefreshCw } from 'lucide-react';
 
@@ -95,7 +97,9 @@ export const App: React.FC = () => {
   const [targetJamOperasi, setTargetJamOperasi] = useState<TargetJamOperasi[]>([]);
   const [targetJamHarian, setTargetJamHarian] = useState<TargetJamHarian[]>([]);
   const [inspections, setInspections] = useState<any[]>([]);
+  const [ppuRecords, setPpuRecords] = useState<any[]>([]);
   const [partServices, setPartServices] = useState<PartServiceItem[]>([]);
+  const [psSchedules, setPsSchedules] = useState<PsScheduleItem[]>([]);
   const [planningFilterUnit, setPlanningFilterUnit] = useState<string | null>(null);
   const [isBDAwalModalOpen, setIsBDAwalModalOpen] = useState(false);
   const requestInFlight = useRef(false);
@@ -141,7 +145,9 @@ export const App: React.FC = () => {
         setTargetJamOperasi(data.targetJamOperasi || []);
         setTargetJamHarian(data.targetJamHarian || []);
         setInspections(data.inspections || []);
+        setPpuRecords(data.ppuRecords || []);
         setPartServices(data.partServices || []);
+        setPsSchedules(data.psSchedules || []);
       }
     } catch (err) {
       console.error('Failed to fetch data from API:', err);
@@ -459,6 +465,20 @@ export const App: React.FC = () => {
                     onClearFilterUnit={() => setPlanningFilterUnit(null)}
                     onRefresh={loadData}
                     onNavigate={tab => setCurrentTab(tab as any)}
+                  />
+                )}
+                {currentTab === 'ps_schedule' && (
+                  <PsScheduleServiceView
+                    psSchedules={psSchedules}
+                    equipments={equipments}
+                    oilSamples={oilSamples}
+                    inspections={inspections}
+                    ppuRecords={ppuRecords}
+                    backlogs={backlogs}
+                    pmRecords={pmRecords}
+                    farRecords={fars}
+                    workOrders={workOrders}
+                    onRefresh={loadData}
                   />
                 )}
                 {currentTab === 'meetings' && (

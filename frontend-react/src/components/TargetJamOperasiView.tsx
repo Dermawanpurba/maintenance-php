@@ -3,7 +3,8 @@ import {
   Calendar, Plus, RefreshCw, Printer, ChevronLeft, ChevronRight,
   Trash2, X, Save, Edit3, CheckCircle, AlertCircle, Clock, Info,
   Filter, Download, Wrench, ShieldCheck, AlertTriangle, Sparkles,
-  Layers, HardHat, FileSpreadsheet, Eye
+  Layers, HardHat, FileSpreadsheet, Eye, Activity, Check,
+  TrendingUp, BarChart3, Settings2
 } from 'lucide-react';
 import { api } from '../services/api';
 import { Equipment, TargetJamOperasi, TargetJamHarian } from '../types';
@@ -20,7 +21,6 @@ const MONTH_NAMES_SHORT = [
 ];
 
 const SECTIONS = ['MINING', 'HAULING', 'SUPPORT', 'MAINTENANCE', 'INFRA'];
-const PM_TYPES_LIST = ['250', '500', '1000', '2000', '4000'];
 const STATUS_LIST = ['RFU', 'BD', 'RWN', 'STANDBY'];
 
 function getDaysInMonth(year: number, month: number): number {
@@ -47,21 +47,7 @@ function formatNumber(val?: number): string {
   return Number(val).toLocaleString('id-ID');
 }
 
-function formatDateShort(dateStr?: string): string {
-  if (!dateStr) return '-';
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const day = String(d.getDate()).padStart(2, '0');
-    const m = MONTH_NAMES_SHORT[d.getMonth()];
-    const yr = String(d.getFullYear()).slice(-2);
-    return `${day}-${m}-${yr}`;
-  } catch {
-    return dateStr;
-  }
-}
-
-// ─── Modal Form (Tambah / Edit Baris) ─────────────────────────────────────────
+// ─── Modal Form (Rencana 1 Bulan: Target Jam & Alokasi BD) ───────────────────
 interface ModalFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -75,6 +61,9 @@ interface ModalFormProps {
 const ModalForm: React.FC<ModalFormProps> = ({
   isOpen, onClose, onSave, editData, equipments, year, month
 }) => {
+  const daysInMonth = getDaysInMonth(year, month);
+  const calendarHours = daysInMonth * 24;
+
   const [form, setForm] = useState<any>({
     equip_no: '',
     section: 'MINING',
@@ -82,14 +71,14 @@ const ModalForm: React.FC<ModalFormProps> = ({
     est_hm: 0,
     est_hm_date: `01-${MONTH_NAMES_SHORT[month - 1]}-${String(year).slice(-2)}`,
     status: 'RFU',
-    next_service_hours_due: 0,
-    next_service_hours_due_2: 0,
-    next_service_type: '250',
-    next_service_type_2: '500',
-    next_service_date: '',
-    next_service_date_2: '',
+    target_operating_hours: 500,
+    target_pa: 88.0,
     pm_250: 0, pm_500: 0, pm_1000: 0, pm_2000: 0, pm_4000: 0,
-    downtime_pm: 0, downtime_backlog: 0, downtime_midlife: 0, downtime_pcr: 0,
+    downtime_pm: 0,
+    downtime_backlog: 0,
+    downtime_midlife: 0,
+    downtime_pcr: 0,
+    downtime_unscheduled: 0,
     plan_year: year,
     plan_month: month,
   });
@@ -97,7 +86,14 @@ const ModalForm: React.FC<ModalFormProps> = ({
 
   useEffect(() => {
     if (editData) {
-      setForm({ ...editData, plan_year: year, plan_month: month });
+      setForm({
+        ...editData,
+        target_operating_hours: editData.target_operating_hours ?? 500,
+        target_pa: editData.target_pa ?? 88.0,
+        downtime_unscheduled: editData.downtime_unscheduled ?? 0,
+        plan_year: year,
+        plan_month: month
+      });
     } else {
       setForm({
         equip_no: '',
@@ -106,14 +102,14 @@ const ModalForm: React.FC<ModalFormProps> = ({
         est_hm: 0,
         est_hm_date: `01-${MONTH_NAMES_SHORT[month - 1]}-${String(year).slice(-2)}`,
         status: 'RFU',
-        next_service_hours_due: 0,
-        next_service_hours_due_2: 0,
-        next_service_type: '250',
-        next_service_type_2: '500',
-        next_service_date: '',
-        next_service_date_2: '',
+        target_operating_hours: 500,
+        target_pa: 88.0,
         pm_250: 0, pm_500: 0, pm_1000: 0, pm_2000: 0, pm_4000: 0,
-        downtime_pm: 0, downtime_backlog: 0, downtime_midlife: 0, downtime_pcr: 0,
+        downtime_pm: 0,
+        downtime_backlog: 0,
+        downtime_midlife: 0,
+        downtime_pcr: 0,
+        downtime_unscheduled: 0,
         plan_year: year,
         plan_month: month,
       });
@@ -123,65 +119,46 @@ const ModalForm: React.FC<ModalFormProps> = ({
   const handleEquipChange = (equipNo: string) => {
     const eq = equipments.find(e => (e.equip_no || e.no_unit) === equipNo);
     const hm = Number(eq?.last_hm || 0);
-    const due1 = Math.ceil((hm + 1) / 250) * 250;
-    const due2 = due1 + 250;
-
-    const calcType = (due: number) => {
-      if (due % 4000 === 0) return '4000';
-      if (due % 2000 === 0) return '2000';
-      if (due % 1000 === 0) return '1000';
-      if (due % 500 === 0) return '500';
-      return '250';
-    };
+    const isBD = (eq?.status || '').toUpperCase() === 'BD';
 
     setForm((p: any) => ({
       ...p,
       equip_no: equipNo,
       model: eq?.model || p.model,
+      section: eq?.unit_type ? (eq.unit_type.toUpperCase().includes('DUMP') ? 'HAULING' : 'MINING') : p.section,
       status: eq?.status || p.status,
       est_hm: hm,
-      next_service_hours_due: due1,
-      next_service_hours_due_2: due2,
-      next_service_type: calcType(due1),
-      next_service_type_2: calcType(due2),
+      target_operating_hours: isBD ? 0 : 500,
+      target_pa: isBD ? 0 : 88.0,
+      downtime_unscheduled: isBD ? calendarHours : 0
     }));
   };
 
-  const handleAutoCalc = () => {
-    const hm = parseFloat(form.est_hm) || 0;
-    const due1 = Math.ceil((hm + 1) / 250) * 250;
-    const due2 = due1 + 250;
+  // Kalkulasi total rencana BD 1 bulan
+  const totalPlannedBD = useMemo(() => {
+    return (parseFloat(form.downtime_pm) || 0) +
+      (parseFloat(form.downtime_backlog) || 0) +
+      (parseFloat(form.downtime_midlife) || 0) +
+      (parseFloat(form.downtime_pcr) || 0) +
+      (parseFloat(form.downtime_unscheduled) || 0);
+  }, [form.downtime_pm, form.downtime_backlog, form.downtime_midlife, form.downtime_pcr, form.downtime_unscheduled]);
 
-    const calcType = (due: number) => {
-      if (due % 4000 === 0) return '4000';
-      if (due % 2000 === 0) return '2000';
-      if (due % 1000 === 0) return '1000';
-      if (due % 500 === 0) return '500';
-      return '250';
-    };
-
-    const type1 = calcType(due1);
-    const type2 = calcType(due2);
-
-    setForm((p: any) => ({
-      ...p,
-      next_service_hours_due: due1,
-      next_service_hours_due_2: due2,
-      next_service_type: type1,
-      next_service_type_2: type2,
-      pm_250: type1 === '250' ? 1 : 0,
-      pm_500: type1 === '500' ? 1 : 0,
-      pm_1000: type1 === '1000' ? 1 : 0,
-      pm_2000: type1 === '2000' ? 1 : 0,
-      pm_4000: type1 === '4000' ? 1 : 0,
-    }));
-  };
+  // Kalkulasi proyeksi PA berdasarkan alokasi BD
+  const projectedPA = useMemo(() => {
+    if (calendarHours <= 0) return '100.0';
+    const pa = Math.max(0, ((calendarHours - totalPlannedBD) / calendarHours) * 100);
+    return pa.toFixed(1);
+  }, [calendarHours, totalPlannedBD]);
 
   const handleSave = async () => {
     if (!form.equip_no) return;
     setSaving(true);
     try {
-      await onSave(form);
+      await onSave({
+        ...form,
+        plan_year: year,
+        plan_month: month
+      });
       onClose();
     } finally {
       setSaving(false);
@@ -198,17 +175,17 @@ const ModalForm: React.FC<ModalFormProps> = ({
       <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-3xl max-h-[92vh] overflow-y-auto">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600">
               <Calendar className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-black text-slate-900 dark:text-white">
-                {editData ? `Edit Schedule Unit: ${editData.equip_no}` : 'Tambah Schedule Service Unit Baru'}
+                {editData ? `Rencana 1 Bulan Unit: ${editData.equip_no}` : 'Tambah Rencana 1 Bulan Unit Baru'}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Periode: {MONTH_NAMES[month - 1]} {year} — WOSys Maintenance System
+                Target Jam Operasi & Alokasi Breakdown — Periode: {MONTH_NAMES[month - 1]} {year}
               </p>
             </div>
           </div>
@@ -218,158 +195,205 @@ const ModalForm: React.FC<ModalFormProps> = ({
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Unit & Section & Model */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className={LabelCls}>Unit No *</label>
-              <select className={InputCls} value={form.equip_no} onChange={e => handleEquipChange(e.target.value)}>
-                <option value="">-- Pilih Unit --</option>
-                {equipments.map(eq => {
-                  const no = eq.equip_no || eq.no_unit;
-                  return <option key={no} value={no}>{no} — {eq.model}</option>;
-                })}
-              </select>
-            </div>
-            <div>
-              <label className={LabelCls}>Section</label>
-              <select className={InputCls} value={form.section} onChange={e => setForm((p: any) => ({ ...p, section: e.target.value }))}>
-                {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={LabelCls}>Model</label>
-              <input type="text" className={InputCls} value={form.model} onChange={e => setForm((p: any) => ({ ...p, model: e.target.value }))} placeholder="D85ESS-2" />
-            </div>
-          </div>
-
-          {/* Est HM, Est HM Date & Status */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800">
-            <div>
-              <label className={LabelCls}>Est. HM Awal Bulan</label>
-              <input type="number" className={InputCls} value={form.est_hm} onChange={e => setForm((p: any) => ({ ...p, est_hm: parseFloat(e.target.value) || 0 }))} />
-            </div>
-            <div>
-              <label className={LabelCls}>Ref. Tanggal HM</label>
-              <input type="text" className={InputCls} value={form.est_hm_date || ''} onChange={e => setForm((p: any) => ({ ...p, est_hm_date: e.target.value }))} placeholder="01-Sep-26" />
-            </div>
-            <div>
-              <label className={LabelCls}>Status Unit</label>
-              <select className={InputCls} value={form.status} onChange={e => setForm((p: any) => ({ ...p, status: e.target.value }))}>
-                {STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Next Service Section */}
-          <div className="p-4 bg-blue-50/60 dark:bg-blue-950/30 rounded-2xl border border-blue-200 dark:border-blue-900/50 space-y-3">
+          {/* Section 1: Identitas Unit */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-blue-700 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Wrench className="w-3.5 h-3.5" /> Next Service Planning (Dual Horizon)
+              <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <HardHat className="w-3.5 h-3.5 text-blue-500" /> 1. Identitas Alat & Status Operasi
               </span>
-              <button
-                type="button"
-                onClick={handleAutoCalc}
-                className="flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 px-3 py-1 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-50 cursor-pointer shadow-sm"
-              >
-                <Sparkles className="w-3 h-3 text-amber-500" /> Auto-Hitung 250 Jam
-              </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Service 1 */}
-              <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-blue-100 dark:border-blue-900/60 space-y-2">
-                <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Service 1 (Terdekat)</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className={LabelCls}>Hours Due</label>
-                    <input type="number" className={InputCls} value={form.next_service_hours_due} onChange={e => setForm((p: any) => ({ ...p, next_service_hours_due: parseFloat(e.target.value) || 0 }))} />
-                  </div>
-                  <div>
-                    <label className={LabelCls}>Type</label>
-                    <select className={InputCls} value={form.next_service_type} onChange={e => setForm((p: any) => ({ ...p, next_service_type: e.target.value }))}>
-                      {PM_TYPES_LIST.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={LabelCls}>Tanggal</label>
-                    <input type="date" className={InputCls} value={form.next_service_date || ''} onChange={e => setForm((p: any) => ({ ...p, next_service_date: e.target.value }))} />
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className={LabelCls}>Unit No *</label>
+                <select className={InputCls} value={form.equip_no} onChange={e => handleEquipChange(e.target.value)}>
+                  <option value="">-- Pilih Unit --</option>
+                  {equipments.map(eq => {
+                    const no = eq.equip_no || eq.no_unit;
+                    return <option key={no} value={no}>{no} — {eq.model}</option>;
+                  })}
+                </select>
+              </div>
+              <div>
+                <label className={LabelCls}>Section Divisi</label>
+                <select className={InputCls} value={form.section} onChange={e => setForm((p: any) => ({ ...p, section: e.target.value }))}>
+                  {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={LabelCls}>Model Alat</label>
+                <input type="text" className={InputCls} value={form.model} onChange={e => setForm((p: any) => ({ ...p, model: e.target.value }))} placeholder="D85ESS-2" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+              <div>
+                <label className={LabelCls}>Est. HM Awal Bulan</label>
+                <input type="number" className={InputCls} value={form.est_hm} onChange={e => setForm((p: any) => ({ ...p, est_hm: parseFloat(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <label className={LabelCls}>Ref. Tanggal HM</label>
+                <input type="text" className={InputCls} value={form.est_hm_date || ''} onChange={e => setForm((p: any) => ({ ...p, est_hm_date: e.target.value }))} placeholder="01-Sep-26" />
+              </div>
+              <div>
+                <label className={LabelCls}>Status Unit</label>
+                <select className={InputCls} value={form.status} onChange={e => setForm((p: any) => ({ ...p, status: e.target.value }))}>
+                  {STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Target Jam Operasi 1 Bulan (MoHH & PA Target) */}
+          <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl border border-blue-200 dark:border-blue-900/50 space-y-3">
+            <span className="text-xs font-black text-blue-700 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" /> 2. Target Operasi 1 Bulan ({MONTH_NAMES[month - 1]} {year})
+            </span>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className={LabelCls}>Jam Kalender Bulan</label>
+                <input type="text" disabled className={`${InputCls} bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold cursor-not-allowed`} value={`${calendarHours} Jam (${daysInMonth} Hari)`} />
+              </div>
+              <div>
+                <label className={LabelCls}>Target Jam Operasi (MoHH)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="5"
+                    className={InputCls}
+                    value={form.target_operating_hours}
+                    onChange={e => setForm((p: any) => ({ ...p, target_operating_hours: parseFloat(e.target.value) || 0 }))}
+                    placeholder="500"
+                  />
+                  <span className="absolute right-3 top-2 text-xs font-bold text-slate-400">Jam</span>
                 </div>
               </div>
-
-              {/* Service 2 */}
-              <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-blue-100 dark:border-blue-900/60 space-y-2">
-                <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Service 2 (Berikutnya)</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className={LabelCls}>Hours Due 2</label>
-                    <input type="number" className={InputCls} value={form.next_service_hours_due_2} onChange={e => setForm((p: any) => ({ ...p, next_service_hours_due_2: parseFloat(e.target.value) || 0 }))} />
-                  </div>
-                  <div>
-                    <label className={LabelCls}>Type 2</label>
-                    <select className={InputCls} value={form.next_service_type_2} onChange={e => setForm((p: any) => ({ ...p, next_service_type_2: e.target.value }))}>
-                      {PM_TYPES_LIST.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={LabelCls}>Tanggal 2</label>
-                    <input type="date" className={InputCls} value={form.next_service_date_2 || ''} onChange={e => setForm((p: any) => ({ ...p, next_service_date_2: e.target.value }))} />
-                  </div>
+              <div>
+                <label className={LabelCls}>Target PA Dicanangkan (%)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.5"
+                    className={InputCls}
+                    value={form.target_pa}
+                    onChange={e => setForm((p: any) => ({ ...p, target_pa: parseFloat(e.target.value) || 0 }))}
+                    placeholder="88.0"
+                  />
+                  <span className="absolute right-3 top-2 text-xs font-bold text-slate-400">%</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* PM Type Flags */}
-          <div className="p-4 bg-rose-50/50 dark:bg-rose-950/20 rounded-2xl border border-rose-200 dark:border-rose-900/50">
-            <p className="text-[10px] font-black text-rose-700 dark:text-rose-300 uppercase tracking-wider mb-2.5">
-              PM Type Scheduled Bulan Ini (Nilai 1 = Berjadwal)
+          {/* Section 3: Rencana Breakdown / Downtime 1 Bulan (Jam) — Fokus Utama */}
+          <div className="p-4 bg-amber-50/50 dark:bg-amber-950/20 rounded-2xl border border-amber-200 dark:border-amber-900/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-amber-800 dark:text-amber-200 uppercase tracking-wider flex items-center gap-1.5">
+                <Wrench className="w-3.5 h-3.5" /> 3. Rencana Alokasi Jam Breakdown (BD) 1 Bulan
+              </span>
+              <span className="text-[11px] font-black text-amber-700 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-900/40 px-2.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-700">
+                Total Rencana: {totalPlannedBD} Jam
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-600 dark:text-slate-400">
+              Alokasikan estimasi jam downtime berdasarkan kategori servis berkala, backlog defect, midlife overhaul, dan pergantian komponen (PCS/PCR).
             </p>
-            <div className="grid grid-cols-5 gap-3">
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div>
+                <label className={LabelCls}>BD PM (Servis)</label>
+                <div className="relative">
+                  <input type="number" step="0.5" className={InputCls} value={form.downtime_pm} onChange={e => setForm((p: any) => ({ ...p, downtime_pm: parseFloat(e.target.value) || 0 }))} placeholder="4" />
+                  <span className="absolute right-2.5 top-2 text-[10px] font-bold text-slate-400">Jam</span>
+                </div>
+              </div>
+              <div>
+                <label className={LabelCls}>BD Backlog</label>
+                <div className="relative">
+                  <input type="number" step="0.5" className={InputCls} value={form.downtime_backlog} onChange={e => setForm((p: any) => ({ ...p, downtime_backlog: parseFloat(e.target.value) || 0 }))} placeholder="0" />
+                  <span className="absolute right-2.5 top-2 text-[10px] font-bold text-slate-400">Jam</span>
+                </div>
+              </div>
+              <div>
+                <label className={LabelCls}>BD Midlife</label>
+                <div className="relative">
+                  <input type="number" step="0.5" className={InputCls} value={form.downtime_midlife} onChange={e => setForm((p: any) => ({ ...p, downtime_midlife: parseFloat(e.target.value) || 0 }))} placeholder="0" />
+                  <span className="absolute right-2.5 top-2 text-[10px] font-bold text-slate-400">Jam</span>
+                </div>
+              </div>
+              <div>
+                <label className={LabelCls}>BD PCS / PCR</label>
+                <div className="relative">
+                  <input type="number" step="0.5" className={InputCls} value={form.downtime_pcr} onChange={e => setForm((p: any) => ({ ...p, downtime_pcr: parseFloat(e.target.value) || 0 }))} placeholder="0" />
+                  <span className="absolute right-2.5 top-2 text-[10px] font-bold text-slate-400">Jam</span>
+                </div>
+              </div>
+              <div>
+                <label className={LabelCls}>BD Unscheduled</label>
+                <div className="relative">
+                  <input type="number" step="0.5" className={InputCls} value={form.downtime_unscheduled} onChange={e => setForm((p: any) => ({ ...p, downtime_unscheduled: parseFloat(e.target.value) || 0 }))} placeholder="0" />
+                  <span className="absolute right-2.5 top-2 text-[10px] font-bold text-slate-400">Jam</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Calculation Preview Card */}
+            <div className="mt-2 p-3 bg-white dark:bg-slate-900 rounded-xl border border-amber-200 dark:border-amber-900/60 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-4 text-xs font-bold">
+                <div>
+                  <span className="text-slate-400">Total Rencana BD: </span>
+                  <span className="text-rose-600 font-black">{totalPlannedBD} Jam</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Kapasitas Jam Jalan: </span>
+                  <span className="text-slate-800 dark:text-slate-200 font-black">{Math.max(0, calendarHours - totalPlannedBD)} Jam</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-400 font-bold">Proyeksi PA:</span>
+                <span className={`text-xs font-black px-2 py-0.5 rounded ${
+                  Number(projectedPA) >= 88 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                  Number(projectedPA) >= 80 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
+                  'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                }`}>
+                  {projectedPA}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: PM Type Berjadwal Bulan Ini */}
+          <div className="p-4 bg-rose-50/50 dark:bg-rose-950/20 rounded-2xl border border-rose-200 dark:border-rose-900/50 space-y-2">
+            <span className="text-xs font-black text-rose-800 dark:text-rose-200 uppercase tracking-wider flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5" /> 4. Checklist Event Servis Berkala (PM Type) Bulan Ini
+            </span>
+            <p className="text-[11px] text-slate-500">Pilih kelipatan servis yang akan dieksekusi pada bulan ini:</p>
+            <div className="grid grid-cols-5 gap-2.5 pt-1">
               {['250', '500', '1000', '2000', '4000'].map(type => {
                 const key = `pm_${type}`;
                 const isChecked = !!(form as any)[key];
                 return (
-                  <label key={type} className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer select-none transition-all ${
-                    isChecked
-                      ? 'bg-rose-100 border-rose-300 text-rose-800 dark:bg-rose-900/40 dark:border-rose-700 dark:text-rose-200 font-bold'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                    <span className="text-xs">{type}</span>
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={e => setForm((p: any) => ({ ...p, [key]: e.target.checked ? 1 : 0 }))}
-                      className="w-4 h-4 rounded accent-rose-600 cursor-pointer"
-                    />
-                  </label>
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setForm((p: any) => ({ ...p, [key]: isChecked ? 0 : 1 }))}
+                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      isChecked
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm shadow-rose-600/30'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    }`}
+                  >
+                    <span>PS-{type}</span>
+                    <span className={`w-4 h-4 rounded flex items-center justify-center text-[10px] ${
+                      isChecked ? 'bg-white/20 text-white' : 'border border-slate-300 dark:border-slate-700'
+                    }`}>
+                      {isChecked ? '✓' : ''}
+                    </span>
+                  </button>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Planned Downtime Allocation */}
-          <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800">
-            <p className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2.5">
-              Estimasi Total Jam Downtime Bulan Ini (Jam)
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div>
-                <label className={LabelCls}>PM Servis</label>
-                <input type="number" step="0.5" className={InputCls} value={form.downtime_pm} onChange={e => setForm((p: any) => ({ ...p, downtime_pm: parseFloat(e.target.value) || 0 }))} placeholder="6" />
-              </div>
-              <div>
-                <label className={LabelCls}>Backlog Defect</label>
-                <input type="number" step="0.5" className={InputCls} value={form.downtime_backlog} onChange={e => setForm((p: any) => ({ ...p, downtime_backlog: parseFloat(e.target.value) || 0 }))} placeholder="0" />
-              </div>
-              <div>
-                <label className={LabelCls}>Midlife Overhaul</label>
-                <input type="number" step="0.5" className={InputCls} value={form.downtime_midlife} onChange={e => setForm((p: any) => ({ ...p, downtime_midlife: parseFloat(e.target.value) || 0 }))} placeholder="0" />
-              </div>
-              <div>
-                <label className={LabelCls}>PCR Component</label>
-                <input type="number" step="0.5" className={InputCls} value={form.downtime_pcr} onChange={e => setForm((p: any) => ({ ...p, downtime_pcr: parseFloat(e.target.value) || 0 }))} placeholder="0" />
-              </div>
             </div>
           </div>
         </div>
@@ -385,7 +409,7 @@ const ModalForm: React.FC<ModalFormProps> = ({
             className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-md shadow-blue-600/20"
           >
             {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {saving ? 'Menyimpan...' : 'Simpan Schedule'}
+            {saving ? 'Menyimpan...' : 'Simpan Rencana 1 Bulan'}
           </button>
         </div>
       </div>
@@ -443,9 +467,8 @@ const JamCell: React.FC<JamCellProps> = ({ equipNo, day, value, onSave, saving }
     );
   }
 
-  // Styling identical to the operational spreadsheet:
-  // 24 = Full day breakdown (solid slate-300/dark:slate-700 block)
-  // 3, 5, 6, 12, 17 = PM service downtime (light slate with bold text)
+  // 24 = Full day breakdown
+  // 3, 4, 6, 8, 12 = Scheduled PM / Component / Backlog service downtime
   let cellBg = '';
   let textCls = '';
 
@@ -503,6 +526,7 @@ export const TargetJamOperasiView: React.FC<Props> = ({
 
   const daysInMonth = getDaysInMonth(year, month);
   const dayArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const calendarHoursPerUnit = daysInMonth * 24;
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -531,19 +555,19 @@ export const TargetJamOperasiView: React.FC<Props> = ({
 
   // Seed demo September 2026
   const handleSeedDemo = async () => {
-    if (!window.confirm('Muat 14 unit data riil template spreadsheet September 2026? Data akan disinkronkan ke database.')) return;
+    if (!window.confirm(`Sinkronkan rencana 1 bulan untuk seluruh unit armada aktif periode ${MONTH_NAMES[month - 1]} ${year}?`)) return;
     setSeeding(true);
     try {
       const res = await api.seedDemoTargetJam(year, month);
       if (res.success) {
-        showToast(res.message || 'Data template September 2026 berhasil dimuat!');
+        showToast(res.message || `Rencana 1 bulan ${MONTH_NAMES[month - 1]} ${year} berhasil disinkronkan!`);
         await loadPeriod();
         onRefresh();
       } else {
         showToast(res.message || 'Gagal memuat template', 'err');
       }
     } catch {
-      showToast('Gagal memuat template demo', 'err');
+      showToast('Gagal memuat template rencana', 'err');
     } finally {
       setSeeding(false);
     }
@@ -581,10 +605,10 @@ export const TargetJamOperasiView: React.FC<Props> = ({
     try {
       const res = await api.savePlanAlatRow({ ...data, plan_year: year, plan_month: month });
       if (res.success) {
-        showToast(res.message || 'Schedule unit tersimpan!');
+        showToast(res.message || 'Rencana 1 bulan unit tersimpan!');
         await loadPeriod();
       } else {
-        showToast(res.message || 'Gagal simpan schedule', 'err');
+        showToast(res.message || 'Gagal simpan rencana unit', 'err');
       }
     } catch {
       showToast('Error koneksi API', 'err');
@@ -593,10 +617,10 @@ export const TargetJamOperasiView: React.FC<Props> = ({
 
   // Delete row
   const handleDeleteRow = async (row: TargetJamOperasi) => {
-    if (!window.confirm(`Hapus jadwal unit ${row.equip_no} periode ${MONTH_NAMES[month - 1]} ${year}?`)) return;
+    if (!window.confirm(`Hapus rencana unit ${row.equip_no} periode ${MONTH_NAMES[month - 1]} ${year}?`)) return;
     try {
       await api.deletePlanAlatRow(row.id!);
-      showToast(`Data ${row.equip_no} dihapus`);
+      showToast(`Data rencana ${row.equip_no} dihapus`);
       await loadPeriod();
     } catch {
       showToast('Gagal menghapus', 'err');
@@ -610,7 +634,7 @@ export const TargetJamOperasiView: React.FC<Props> = ({
       if (filterStatus !== 'ALL') {
         const s = (r.status || '').toUpperCase();
         if (filterStatus === 'BD' && s !== 'BD' && s !== 'B/D') return false;
-        if (filterStatus === 'RFU' && s !== 'RFU') return false;
+        if (filterStatus === 'RFU' && s !== 'RFU' && s !== 'READY') return false;
       }
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -634,10 +658,20 @@ export const TargetJamOperasiView: React.FC<Props> = ({
     return rec ? rec.jam_rencana : 0;
   };
 
-  const getTotalDowntime = (equipNo: string): number => {
+  // Total jam downtime yang sudah dialokasikan di Gantt (H-1 s/d H-31)
+  const getTotalGanttDowntime = (equipNo: string): number => {
     return harian
       .filter(h => h.equip_no === equipNo && h.plan_year === year && h.plan_month === month)
       .reduce((s, h) => s + (h.jam_rencana || 0), 0);
+  };
+
+  // Total rencana BD 1 bulan dari parameter: PM + Backlog + Midlife + PCR + Unscheduled
+  const getTotalPlannedBD = (row: TargetJamOperasi): number => {
+    return (row.downtime_pm || 0) +
+      (row.downtime_backlog || 0) +
+      (row.downtime_midlife || 0) +
+      (row.downtime_pcr || 0) +
+      (row.downtime_unscheduled || 0);
   };
 
   // Month navigation
@@ -650,16 +684,43 @@ export const TargetJamOperasiView: React.FC<Props> = ({
     else setMonth(m => m + 1);
   };
 
-  // Fleet Statistics
-  const totalFleetHours = rows.length * daysInMonth * 24;
+  // ─── Fleet Statistics for 1-Month Plan ──────────────────────────────────────
+  const totalFleetHours = rows.length * calendarHoursPerUnit;
+  
+  // Total jam rencana BD 1 bulan (akumulasi seluruh armada)
+  const totalPlannedDowntimeFleet = rows.reduce((s, r) => s + getTotalPlannedBD(r), 0);
+  
+  // Total breakdown berdasarkan kategori
+  const totalDowntimePm = rows.reduce((s, r) => s + (r.downtime_pm || 0), 0);
+  const totalDowntimeBacklog = rows.reduce((s, r) => s + (r.downtime_backlog || 0), 0);
+  const totalDowntimeMidlife = rows.reduce((s, r) => s + (r.downtime_midlife || 0), 0);
+  const totalDowntimePcr = rows.reduce((s, r) => s + (r.downtime_pcr || 0), 0);
+  const totalDowntimeUnsch = rows.reduce((s, r) => s + (r.downtime_unscheduled || 0), 0);
+
+  // Target jam operasi armada (MoHH)
+  const totalTargetOperatingHours = rows.reduce((s, r) => {
+    const isBD = (r.status || '').toUpperCase() === 'BD' || (r.status || '').toUpperCase() === 'B/D';
+    return s + (r.target_operating_hours ?? (isBD ? 0 : 500));
+  }, 0);
+
+  const avgTargetOperatingHours = rows.length > 0
+    ? Math.round(totalTargetOperatingHours / rows.length)
+    : 0;
+
+  // Total jam yang sudah terdistribusi di kalender Gantt
   const totalFleetDowntime = harian
     .filter(h => h.plan_year === year && h.plan_month === month)
     .reduce((s, h) => s + (h.jam_rencana || 0), 0);
+
   const projectedFleetPA = totalFleetHours > 0
     ? (((totalFleetHours - totalFleetDowntime) / totalFleetHours) * 100).toFixed(1)
     : '100.0';
 
-  const totalRFU = rows.filter(r => (r.status || '').toUpperCase() === 'RFU').length;
+  const avgTargetPA = rows.length > 0
+    ? (rows.reduce((s, r) => s + (r.target_pa ?? 88.0), 0) / rows.length).toFixed(1)
+    : '88.0';
+
+  const totalRFU = rows.filter(r => (r.status || '').toUpperCase() === 'RFU' || (r.status || '').toUpperCase() === 'READY').length;
   const totalBD = rows.filter(r => (r.status || '').toUpperCase() === 'BD' || (r.status || '').toUpperCase() === 'B/D').length;
 
   const totalPM250 = rows.filter(r => !!r.pm_250).length;
@@ -668,50 +729,58 @@ export const TargetJamOperasiView: React.FC<Props> = ({
   const totalPM2000 = rows.filter(r => !!r.pm_2000).length;
   const totalPM4000 = rows.filter(r => !!r.pm_4000).length;
 
-  // Export to CSV
+  // Persentase jam rencana BD yang telah diplot ke kalender harian
+  const percentPlotted = totalPlannedDowntimeFleet > 0
+    ? Math.min(100, Math.round((totalFleetDowntime / totalPlannedDowntimeFleet) * 100))
+    : 100;
+
+  // Export to CSV — Rencana 1 Bulan
   const handleExportCSV = () => {
     const headers = [
-      'SECTION', 'UNIT NO', 'MODEL', 'Est. HM', 'STATUS',
-      'NEXT SERVICE HRS DUE 1', 'NEXT SERVICE HRS DUE 2',
-      'NEXT SERVICE TYPE 1', 'NEXT SERVICE TYPE 2',
-      'NEXT SERVICE DATE 1', 'NEXT SERVICE DATE 2',
+      'SECTION', 'UNIT NO', 'MODEL', 'STATUS', 'Est. HM AWAL',
+      'JAM KALENDER', 'TARGET MOHH', 'TARGET PA (%)',
+      'BD PM (JAM)', 'BD BACKLOG (JAM)', 'BD MIDLIFE (JAM)', 'BD PCS/PCR (JAM)', 'BD UNSCH (JAM)',
+      'TOTAL RENCANA BD (JAM)',
       'PM 250', 'PM 500', 'PM 1000', 'PM 2000', 'PM 4000',
-      'DOWNTIME PM', 'DOWNTIME BACKLOG', 'DOWNTIME MIDLIFE', 'DOWNTIME PCR',
-      ...dayArray.map(d => `D-${d}`),
-      'TOTAL DOWNTIME', 'PA PROJ (%)'
+      ...dayArray.map(d => `D-${String(d).padStart(2, '0')}`),
+      'TERJADWAL GANTT (JAM)', 'SELISIH BD (JAM)', 'PROYEKSI PA (%)'
     ];
 
     const csvRows = [headers.join(',')];
 
     filteredRows.forEach(r => {
-      const dt = getTotalDowntime(r.equip_no);
-      const avail = daysInMonth * 24;
-      const pa = avail > 0 ? (((avail - dt) / avail) * 100).toFixed(1) : '100.0';
+      const isBD = (r.status || '').toUpperCase() === 'BD' || (r.status || '').toUpperCase() === 'B/D';
+      const plannedBD = getTotalPlannedBD(r);
+      const ganttDT = getTotalGanttDowntime(r.equip_no);
+      const selisih = plannedBD - ganttDT;
+      const paProj = calendarHoursPerUnit > 0
+        ? (((calendarHoursPerUnit - ganttDT) / calendarHoursPerUnit) * 100).toFixed(1)
+        : '100.0';
 
       const rowData = [
-        `"${r.section || ''}"`,
+        `"${r.section || 'MINING'}"`,
         `"${r.equip_no}"`,
         `"${r.model || ''}"`,
-        r.est_hm || 0,
         `"${r.status || 'RFU'}"`,
-        r.next_service_hours_due || 0,
-        r.next_service_hours_due_2 || 0,
-        `"${r.next_service_type || ''}"`,
-        `"${r.next_service_type_2 || ''}"`,
-        `"${r.next_service_date || ''}"`,
-        `"${r.next_service_date_2 || ''}"`,
+        r.est_hm || 0,
+        calendarHoursPerUnit,
+        r.target_operating_hours ?? (isBD ? 0 : 500),
+        r.target_pa ?? (isBD ? 0 : 88.0),
+        r.downtime_pm || 0,
+        r.downtime_backlog || 0,
+        r.downtime_midlife || 0,
+        r.downtime_pcr || 0,
+        r.downtime_unscheduled || 0,
+        plannedBD,
         r.pm_250 ? 1 : 0,
         r.pm_500 ? 1 : 0,
         r.pm_1000 ? 1 : 0,
         r.pm_2000 ? 1 : 0,
         r.pm_4000 ? 1 : 0,
-        r.downtime_pm || 0,
-        r.downtime_backlog || 0,
-        r.downtime_midlife || 0,
-        r.downtime_pcr || 0,
         ...dayArray.map(d => getJam(r.equip_no, d)),
-        dt,
-        pa
+        ganttDT,
+        selisih,
+        paProj
       ];
       csvRows.push(rowData.join(','));
     });
@@ -720,7 +789,7 @@ export const TargetJamOperasiView: React.FC<Props> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Schedule_Service_PM_${MONTH_NAMES_SHORT[month - 1]}_${year}.csv`;
+    a.download = `Rencana_1_Bulan_Target_Operasi_${MONTH_NAMES_SHORT[month - 1]}_${year}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -743,17 +812,17 @@ export const TargetJamOperasiView: React.FC<Props> = ({
           <div>
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600">
-                <FileSpreadsheet className="w-5 h-5" />
+                <Calendar className="w-5 h-5" />
               </div>
               <div>
                 <h1 className="text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                  Schedule Service (PM) & Downtime Gantt Matrix
+                  Target Jam Operasi & Rencana BD 1 Bulan
                   <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                     PERIODE {MONTH_NAMES_SHORT[month - 1].toUpperCase()} {year}
                   </span>
                 </h1>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Rencana servis berkala kelipatan 250 Jam, alokasi jam downtime, dan kalender kesiapan armada tambang
+                  Fokus rencana 1 bulan: target jam operasi armada (MoHH), alokasi jam breakdown (PM, Backlog, Midlife, PCS/PCR), dan distribusi kalender harian
                 </p>
               </div>
             </div>
@@ -774,15 +843,15 @@ export const TargetJamOperasiView: React.FC<Props> = ({
               </button>
             </div>
 
-            {/* Template Seed Demo Button (Direct match with screenshot) */}
+            {/* Template Seed / Sync Button */}
             <button
               onClick={handleSeedDemo}
               disabled={seeding}
               className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl hover:bg-amber-100 dark:hover:bg-amber-900/40 cursor-pointer transition-all shadow-sm"
-              title="Muat 14 data riil screenshot September 2026"
+              title="Sinkronkan rencana 1 bulan dengan data unit riil"
             >
               <Sparkles className={`w-3.5 h-3.5 text-amber-600 ${seeding ? 'animate-spin' : ''}`} />
-              {seeding ? 'Memuat Template...' : 'Muat Data Template September 2026'}
+              {seeding ? 'Menyinkronkan...' : 'Sinkronkan Rencana 1 Bulan'}
             </button>
 
             {/* Refresh */}
@@ -813,18 +882,18 @@ export const TargetJamOperasiView: React.FC<Props> = ({
               Print
             </button>
 
-            {/* Add Unit */}
+            {/* Add Unit Plan */}
             <button
               onClick={() => { setEditRow(null); setModalOpen(true); }}
               className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-2xl cursor-pointer transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-md shadow-blue-600/20"
             >
               <Plus className="w-3.5 h-3.5" />
-              Tambah Unit
+              Tambah Rencana Unit
             </button>
           </div>
         </div>
 
-        {/* Filter Bar */}
+        {/* Filter Bar & Legend */}
         <div className="flex items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex-wrap">
           <div className="flex items-center gap-3 flex-wrap">
             {/* Search */}
@@ -862,76 +931,88 @@ export const TargetJamOperasiView: React.FC<Props> = ({
           <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 dark:text-slate-400 flex-wrap">
             <span className="flex items-center gap-1.5">
               <span className="w-3.5 h-3.5 rounded bg-slate-300 dark:bg-slate-700 inline-block border border-slate-400" />
-              <span>24h (Breakdown/BD)</span>
+              <span>24h (Full Breakdown/BD)</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3.5 h-3.5 rounded bg-slate-200/80 dark:bg-slate-800 inline-block border border-slate-300" />
-              <span>Jam Servis PM (3–17h)</span>
+              <span>Servis PM / Backlog (3–16h)</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3.5 h-3.5 rounded bg-rose-100 border border-rose-300 inline-block" />
-              <span>PM Scheduled (Pink)</span>
+              <span>PM Event Berjadwal</span>
             </span>
             <span className="text-blue-600 dark:text-blue-400 flex items-center gap-1">
-              <Info className="w-3 h-3" /> Klik sel untuk ubah jam
+              <Info className="w-3 h-3" /> Klik sel kalender untuk ubah jam harian
             </span>
           </div>
         </div>
       </div>
 
-      {/* Top KPI Cards (Fleet Availability & PM Counts) */}
+      {/* Top KPI Cards (Fokus Rencana 1 Bulan: Target MoHH, Total Rencana BD & Breakdown Kategori) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 print:hidden">
+        {/* Card 1: Kesiapan Armada */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Armada</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Armada & Kesiapan</p>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-xl font-black text-slate-900 dark:text-white">{rows.length}</span>
             <span className="text-[11px] font-bold text-emerald-600">{totalRFU} RFU</span>
             <span className="text-[11px] font-bold text-rose-600">{totalBD} BD</span>
           </div>
+          <p className="text-[10px] text-slate-400 mt-1">Kesiapan operasional aktif</p>
         </div>
 
+        {/* Card 2: Target Jam Operasi (MoHH) */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Proyeksi PA Armada</p>
-          <div className="flex items-baseline gap-1 mt-1">
-            <span className={`text-xl font-black ${
-              Number(projectedFleetPA) >= 90 ? 'text-emerald-600' : Number(projectedFleetPA) >= 80 ? 'text-amber-600' : 'text-rose-600'
-            }`}>
-              {projectedFleetPA}%
-            </span>
-            <span className="text-[10px] text-slate-400 font-semibold">Physical Avail.</span>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Target MoHH Armada</p>
+          <div className="flex items-baseline gap-1.5 mt-1">
+            <span className="text-xl font-black text-blue-600">{formatNumber(totalTargetOperatingHours)}</span>
+            <span className="text-xs font-bold text-slate-500">Jam</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">Rata-rata: {avgTargetOperatingHours} Jam / Unit</p>
+        </div>
+
+        {/* Card 3: Total Rencana BD 1 Bulan */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Rencana BD 1 Bln</p>
+          <div className="flex items-baseline gap-1.5 mt-1">
+            <span className="text-xl font-black text-rose-600">{formatNumber(totalPlannedDowntimeFleet)}</span>
+            <span className="text-xs font-bold text-slate-500">Jam</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">PM + Backlog + Midlife + PCS</p>
+        </div>
+
+        {/* Card 4: Rincian Kategori Rencana BD */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Komposisi BD Rencana</p>
+          <div className="text-[10.5px] font-black text-slate-700 dark:text-slate-300 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+            <span>PM: <b className="text-blue-600">{totalDowntimePm}h</b></span>
+            <span>BL: <b className="text-amber-600">{totalDowntimeBacklog}h</b></span>
+            <span>ML: <b className="text-purple-600">{totalDowntimeMidlife}h</b></span>
+            <span>PCS: <b className="text-teal-600">{totalDowntimePcr}h</b></span>
+            <span>Unsch: <b className="text-rose-600">{totalDowntimeUnsch}h</b></span>
           </div>
         </div>
 
+        {/* Card 5: Target PA vs Proyeksi Gantt */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total PM Berjadwal</p>
-          <p className="text-xl font-black text-blue-600 mt-1">
-            {totalPM250 + totalPM500 + totalPM1000 + totalPM2000 + totalPM4000} <span className="text-xs font-bold text-slate-500">Event</span>
-          </p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Target vs Proyeksi PA</p>
+          <div className="flex items-baseline gap-1.5 mt-1">
+            <span className="text-xl font-black text-emerald-600">{avgTargetPA}%</span>
+            <span className="text-xs font-bold text-slate-400">Target</span>
+            <span className="text-xs font-black text-blue-600">({projectedFleetPA}%)</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">Proyeksi ketersediaan fisik</p>
         </div>
 
+        {/* Card 6: Alokasi Kalender Gantt */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Distribusi PM Type</p>
-          <p className="text-[11px] font-black text-slate-700 dark:text-slate-300 mt-1.5 flex gap-2">
-            <span>250: <b className="text-blue-600">{totalPM250}</b></span>
-            <span>500: <b className="text-indigo-600">{totalPM500}</b></span>
-            <span>1K: <b className="text-amber-600">{totalPM1000}</b></span>
-            <span>2K: <b className="text-purple-600">{totalPM2000}</b></span>
-            <span>4K: <b className="text-rose-600">{totalPM4000}</b></span>
-          </p>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Jam Downtime</p>
-          <p className="text-xl font-black text-rose-600 mt-1">
-            {totalFleetDowntime} <span className="text-xs font-bold text-slate-500">Jam</span>
-          </p>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Jam Operasi Terencana</p>
-          <p className="text-xl font-black text-slate-900 dark:text-white mt-1">
-            {formatNumber(Math.max(0, totalFleetHours - totalFleetDowntime))} <span className="text-xs font-bold text-slate-500">Jam</span>
-          </p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Plotting Kalender</p>
+          <div className="flex items-baseline gap-1 mt-1">
+            <span className="text-xl font-black text-slate-900 dark:text-white">{totalFleetDowntime}</span>
+            <span className="text-xs font-bold text-slate-400">/ {totalPlannedDowntimeFleet}h</span>
+            <span className="text-[11px] font-bold text-emerald-600 ml-1">({percentPlotted}%)</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">Jam terdistribusi di Gantt</p>
         </div>
       </div>
 
@@ -944,57 +1025,58 @@ export const TargetJamOperasiView: React.FC<Props> = ({
         )}
 
         <div className="overflow-x-auto overflow-y-auto max-h-[75vh] print:max-h-none print:overflow-visible">
-          <table className="w-full border-collapse text-[11px]" style={{ minWidth: 1600 }}>
-            {/* ── Table Header (Exact 2-Row Match with Spreadsheet) ── */}
+          <table className="w-full border-collapse text-[11px]" style={{ minWidth: 1680 }}>
+            {/* ── Table Header (Fokus Rencana 1 Bulan: No Next Service Clutter) ── */}
             <thead>
-              {/* Row 1 */}
+              {/* Row 1: Header Clusters */}
               <tr className="bg-[#2a303c] text-white text-[10px] font-black uppercase tracking-wider">
-                <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center sticky left-0 z-30 bg-[#2a303c]" style={{ minWidth: 80 }}>
+                {/* 1. IDENTITAS & BASELINE (Sticky Left) */}
+                <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center sticky left-0 z-30 bg-[#2a303c]" style={{ minWidth: 78 }}>
                   SECTION
                 </th>
-                <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center sticky left-[80px] z-30 bg-[#2a303c]" style={{ minWidth: 85 }}>
+                <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center sticky left-[78px] z-30 bg-[#2a303c]" style={{ minWidth: 85 }}>
                   UNIT NO
                 </th>
-                <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center sticky left-[165px] z-30 bg-[#2a303c]" style={{ minWidth: 95 }}>
+                <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center sticky left-[163px] z-30 bg-[#2a303c]" style={{ minWidth: 95 }}>
                   MODEL
-                </th>
-                <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center" style={{ minWidth: 80 }}>
-                  Est. HM<br />
-                  <span className="text-[9px] font-normal opacity-80">{MONTH_NAMES_SHORT[month - 1]}-{String(year).slice(-2)}</span>
                 </th>
                 <th rowSpan={2} className="border border-slate-600 px-1 py-2 text-center" style={{ minWidth: 60 }}>
                   STATUS
                 </th>
-                {/* NEXT SERVICE (6 Columns) */}
-                <th colSpan={6} className="border border-slate-600 px-2 py-1.5 text-center bg-slate-700">
-                  NEXT SERVICE
+                <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center" style={{ minWidth: 80 }}>
+                  Est. HM<br />
+                  <span className="text-[9px] font-normal opacity-80">01-{MONTH_NAMES_SHORT[month - 1]}</span>
                 </th>
-                {/* PM TYPE (5 Columns) */}
+
+                {/* 2. TARGET OPERASI 1 BULAN (Bulanan) */}
+                <th colSpan={3} className="border border-slate-600 px-2 py-1.5 text-center bg-blue-900/90">
+                  TARGET OPERASI 1 BULAN
+                </th>
+
+                {/* 3. RENCANA DOWNTIME / BD 1 BULAN (JAM) — Fokus Utama */}
+                <th colSpan={6} className="border border-slate-600 px-2 py-1.5 text-center bg-rose-900/90 text-rose-100">
+                  RENCANA DOWNTIME / BD BULAN INI (JAM)
+                </th>
+
+                {/* 4. PM EVENT BULAN INI (Checklist 5 Kelipatan) */}
                 <th colSpan={5} className="border border-slate-600 px-2 py-1.5 text-center bg-amber-900/90">
-                  PM TYPE
+                  PM EVENT
                 </th>
-                {/* DOWNTIME SUMMARY (4 Columns) */}
-                <th rowSpan={2} className="border border-slate-600 px-1 py-1 text-center bg-slate-800 text-[9px]" style={{ minWidth: 36 }}>
-                  PM
-                </th>
-                <th rowSpan={2} className="border border-slate-600 px-1 py-1 text-center bg-slate-800 text-[9px]" style={{ minWidth: 50 }}>
-                  BACK<br/>LOG
-                </th>
-                <th rowSpan={2} className="border border-slate-600 px-1 py-1 text-center bg-slate-800 text-[9px]" style={{ minWidth: 45 }}>
-                  MID<br/>LIFE
-                </th>
-                <th rowSpan={2} className="border border-slate-600 px-1 py-1 text-center bg-slate-800 text-[9px]" style={{ minWidth: 38 }}>
-                  PCR
-                </th>
-                {/* PERIODE CALENDAR */}
+
+                {/* 5. DISTRIBUSI KALENDER HARIAN GANTT */}
                 <th colSpan={daysInMonth} className="border border-slate-600 px-2 py-1.5 text-center bg-[#1e293b]">
-                  PERIODE {MONTH_NAMES_SHORT[month - 1].toUpperCase()} {year}
+                  DISTRIBUSI GANTT HARIAN — {MONTH_NAMES_SHORT[month - 1].toUpperCase()} {year}
+                </th>
+
+                {/* 6. REKAPITULASI & SINKRONISASI KALENDER */}
+                <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center bg-slate-800" style={{ minWidth: 65 }}>
+                  TERJADWAL<br/>GANTT
                 </th>
                 <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center bg-slate-800" style={{ minWidth: 60 }}>
-                  TOTAL<br/>DT
+                  SELISIH<br/>BD (h)
                 </th>
                 <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center bg-slate-800" style={{ minWidth: 55 }}>
-                  PA<br/>(%)
+                  PROYEKSI<br/>PA (%)
                 </th>
                 <th rowSpan={2} className="border border-slate-600 px-2 py-2 text-center bg-slate-800 print:hidden" style={{ minWidth: 60 }}>
                   AKSI
@@ -1003,19 +1085,26 @@ export const TargetJamOperasiView: React.FC<Props> = ({
 
               {/* Row 2: Sub-headers */}
               <tr className="bg-[#1e293b] text-white text-[9px] font-bold uppercase tracking-wide">
-                {/* Sub NEXT SERVICE */}
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-slate-700" style={{ minWidth: 60 }}>HRS DUE</th>
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-slate-700" style={{ minWidth: 60 }}>DUE 2</th>
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-slate-700" style={{ minWidth: 45 }}>TYPE</th>
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-slate-700" style={{ minWidth: 45 }}>TYPE 2</th>
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-slate-700" style={{ minWidth: 70 }}>NEXT DATE</th>
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-slate-700" style={{ minWidth: 70 }}>DATE 2</th>
-                {/* Sub PM TYPE */}
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-amber-900/90" style={{ minWidth: 32 }}>250</th>
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-amber-900/90" style={{ minWidth: 32 }}>500</th>
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-amber-900/90" style={{ minWidth: 35 }}>1000</th>
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-amber-900/90" style={{ minWidth: 35 }}>2000</th>
-                <th className="border border-slate-600 px-1 py-1.5 text-center bg-amber-900/90" style={{ minWidth: 35 }}>4000</th>
+                {/* Sub Target Operasi */}
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-blue-900/80" style={{ minWidth: 55 }}>KALENDER</th>
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-blue-900/80" style={{ minWidth: 65 }}>MOHH PLAN</th>
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-blue-900/80" style={{ minWidth: 55 }}>TARGET PA</th>
+
+                {/* Sub Rencana BD 1 Bulan (PM, Backlog, Midlife, PCS/PCR, Unscheduled, Total BD) */}
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-rose-900/80" style={{ minWidth: 42 }}>BD PM</th>
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-rose-900/80" style={{ minWidth: 45 }}>BACKLOG</th>
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-rose-900/80" style={{ minWidth: 45 }}>MIDLIFE</th>
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-rose-900/80" style={{ minWidth: 45 }}>PCS/PCR</th>
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-rose-900/80" style={{ minWidth: 45 }}>UNSCH</th>
+                <th className="border border-slate-600 px-1.5 py-1.5 text-center bg-rose-950 font-black text-rose-200" style={{ minWidth: 62 }}>TOTAL BD</th>
+
+                {/* Sub PM Event */}
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-amber-900/80" style={{ minWidth: 30 }}>250</th>
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-amber-900/80" style={{ minWidth: 30 }}>500</th>
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-amber-900/80" style={{ minWidth: 35 }}>1000</th>
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-amber-900/80" style={{ minWidth: 35 }}>2000</th>
+                <th className="border border-slate-600 px-1 py-1.5 text-center bg-amber-900/80" style={{ minWidth: 35 }}>4000</th>
+
                 {/* Day Columns */}
                 {dayArray.map(d => (
                   <th
@@ -1040,16 +1129,16 @@ export const TargetJamOperasiView: React.FC<Props> = ({
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={23 + daysInMonth} className="py-20 text-center">
+                  <td colSpan={19 + daysInMonth} className="py-20 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <Calendar className="w-12 h-12 text-slate-300 dark:text-slate-700" />
-                      <p className="font-bold text-slate-500 dark:text-slate-400">Belum ada jadwal unit untuk periode ini</p>
-                      <p className="text-xs text-slate-400">Klik tombol di bawah untuk memuat data template riil September 2026</p>
+                      <p className="font-bold text-slate-500 dark:text-slate-400">Belum ada rencana jadwal unit untuk periode ini</p>
+                      <p className="text-xs text-slate-400">Klik tombol di bawah untuk menyinkronkan seluruh unit armada aktif</p>
                       <button
                         onClick={handleSeedDemo}
-                        className="mt-2 flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-2xl shadow-md cursor-pointer transition-all"
+                        className="mt-2 flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-2xl shadow-md cursor-pointer transition-all"
                       >
-                        <Sparkles className="w-4 h-4" /> Muat 14 Unit Template Screenshot September 2026
+                        <Sparkles className="w-4 h-4" /> Sinkronkan Rencana 1 Bulan Seluruh Unit
                       </button>
                     </div>
                   </td>
@@ -1058,10 +1147,25 @@ export const TargetJamOperasiView: React.FC<Props> = ({
                 filteredRows.map((row, idx) => {
                   const statusStr = (row.status || 'RFU').toUpperCase();
                   const isBD = statusStr === 'BD' || statusStr === 'B/D';
-                  const dtTotal = getTotalDowntime(row.equip_no);
-                  const calendarHours = daysInMonth * 24;
-                  const paPercent = calendarHours > 0
-                    ? Math.max(0, ((calendarHours - dtTotal) / calendarHours) * 100).toFixed(1)
+                  
+                  // Total rencana BD 1 bulan
+                  const plannedBD = getTotalPlannedBD(row);
+                  
+                  // Total downtime yang teralokasi di kalender Gantt
+                  const ganttDT = getTotalGanttDowntime(row.equip_no);
+                  
+                  // Selisih antara Rencana BD dengan apa yang sudah diplot di kalender
+                  const selisihBD = plannedBD - ganttDT;
+
+                  // Target jam jalan MoHH
+                  const targetMoHH = row.target_operating_hours ?? (isBD ? 0 : 500);
+
+                  // Target PA dicanangkan
+                  const targetPA = row.target_pa ?? (isBD ? 0 : 88.0);
+
+                  // Proyeksi PA aktual dari distribusi Gantt
+                  const paPercent = calendarHoursPerUnit > 0
+                    ? Math.max(0, ((calendarHoursPerUnit - ganttDT) / calendarHoursPerUnit) * 100).toFixed(1)
                     : '100.0';
 
                   const rowBg = idx % 2 === 0
@@ -1076,7 +1180,7 @@ export const TargetJamOperasiView: React.FC<Props> = ({
                       </td>
 
                       {/* UNIT NO (Sticky Left 2) */}
-                      <td className={`border border-slate-300 dark:border-slate-700 px-2 py-1.5 text-center font-black text-slate-900 dark:text-white sticky left-[80px] z-20 ${rowBg}`}>
+                      <td className={`border border-slate-300 dark:border-slate-700 px-2 py-1.5 text-center font-black text-slate-900 dark:text-white sticky left-[78px] z-20 ${rowBg}`}>
                         <div className="flex items-center justify-center gap-1.5">
                           <span className={`w-2 h-2 rounded-full ${isBD ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
                           <span className="tracking-tight">{row.equip_no}</span>
@@ -1084,13 +1188,8 @@ export const TargetJamOperasiView: React.FC<Props> = ({
                       </td>
 
                       {/* MODEL (Sticky Left 3) */}
-                      <td className={`border border-slate-300 dark:border-slate-700 px-2 py-1.5 text-center font-semibold text-slate-600 dark:text-slate-400 sticky left-[165px] z-20 ${rowBg}`}>
+                      <td className={`border border-slate-300 dark:border-slate-700 px-2 py-1.5 text-center font-semibold text-slate-600 dark:text-slate-400 sticky left-[163px] z-20 ${rowBg}`}>
                         {row.model || '-'}
-                      </td>
-
-                      {/* Est. HM */}
-                      <td className="border border-slate-300 dark:border-slate-700 px-2 py-1.5 text-center font-bold text-slate-800 dark:text-slate-200">
-                        {formatNumber(row.est_hm || (equipments.find(e => (e.equip_no || e.no_unit) === row.equip_no)?.last_hm || 0))}
                       </td>
 
                       {/* STATUS */}
@@ -1104,27 +1203,43 @@ export const TargetJamOperasiView: React.FC<Props> = ({
                         </span>
                       </td>
 
-                      {/* NEXT SERVICE (6 Columns) */}
-                      <td className="border border-slate-300 dark:border-slate-700 px-1.5 py-1 text-center font-semibold text-slate-800 dark:text-slate-200">
-                        {row.next_service_hours_due ? formatNumber(row.next_service_hours_due) : '-'}
-                      </td>
-                      <td className="border border-slate-300 dark:border-slate-700 px-1.5 py-1 text-center font-semibold text-slate-500 dark:text-slate-400">
-                        {row.next_service_hours_due_2 ? formatNumber(row.next_service_hours_due_2) : '-'}
-                      </td>
-                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-bold text-blue-700 dark:text-blue-300">
-                        {row.next_service_type || '-'}
-                      </td>
-                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-medium text-slate-500 dark:text-slate-400">
-                        {row.next_service_type_2 || '-'}
-                      </td>
-                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                        {formatDateShort(row.next_service_date)}
-                      </td>
-                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center text-[10px] font-medium text-slate-400">
-                        {formatDateShort(row.next_service_date_2)}
+                      {/* Est. HM AWAL */}
+                      <td className="border border-slate-300 dark:border-slate-700 px-2 py-1.5 text-center font-bold text-slate-800 dark:text-slate-200">
+                        {formatNumber(row.est_hm || (equipments.find(e => (e.equip_no || e.no_unit) === row.equip_no)?.last_hm || 0))}
                       </td>
 
-                      {/* PM TYPE (5 Columns - Pink highlight when scheduled!) */}
+                      {/* TARGET OPERASI 1 BULAN: Kalender, MoHH Plan, Target PA */}
+                      <td className="border border-slate-300 dark:border-slate-700 px-1.5 py-1 text-center font-bold text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-850/40">
+                        {calendarHoursPerUnit}h
+                      </td>
+                      <td className="border border-slate-300 dark:border-slate-700 px-1.5 py-1 text-center font-black text-blue-700 dark:text-blue-300 bg-blue-50/30 dark:bg-blue-950/20">
+                        {formatNumber(targetMoHH)}h
+                      </td>
+                      <td className="border border-slate-300 dark:border-slate-700 px-1.5 py-1 text-center font-black text-emerald-700 dark:text-emerald-300 bg-emerald-50/30 dark:bg-emerald-950/20">
+                        {targetPA}%
+                      </td>
+
+                      {/* RENCANA DOWNTIME / BD 1 BULAN (JAM): PM, Backlog, Midlife, PCS, Unsch, Total BD */}
+                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-bold text-slate-800 dark:text-slate-200 bg-rose-50/20 dark:bg-rose-950/10">
+                        {row.downtime_pm ? `${row.downtime_pm}` : '-'}
+                      </td>
+                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-bold text-amber-700 dark:text-amber-300 bg-rose-50/20 dark:bg-rose-950/10">
+                        {row.downtime_backlog ? `${row.downtime_backlog}` : '-'}
+                      </td>
+                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-bold text-purple-700 dark:text-purple-300 bg-rose-50/20 dark:bg-rose-950/10">
+                        {row.downtime_midlife ? `${row.downtime_midlife}` : '-'}
+                      </td>
+                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-bold text-teal-700 dark:text-teal-300 bg-rose-50/20 dark:bg-rose-950/10">
+                        {row.downtime_pcr ? `${row.downtime_pcr}` : '-'}
+                      </td>
+                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-bold text-rose-700 dark:text-rose-400 bg-rose-50/20 dark:bg-rose-950/10">
+                        {row.downtime_unscheduled ? `${row.downtime_unscheduled}` : '-'}
+                      </td>
+                      <td className="border border-slate-300 dark:border-slate-700 px-2 py-1 text-center font-black text-rose-700 dark:text-rose-300 bg-rose-100/60 dark:bg-rose-950/40">
+                        {plannedBD}h
+                      </td>
+
+                      {/* PM EVENT FLAGS (5 Columns - Pink highlight when scheduled) */}
                       {['pm_250', 'pm_500', 'pm_1000', 'pm_2000', 'pm_4000'].map(key => {
                         const isScheduled = !!(row as any)[key];
                         return (
@@ -1141,21 +1256,7 @@ export const TargetJamOperasiView: React.FC<Props> = ({
                         );
                       })}
 
-                      {/* DOWNTIME SUMMARY (PM, BACKLOG, MIDLIFE, PCR) */}
-                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-black text-slate-900 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-800/30">
-                        {row.downtime_pm ? row.downtime_pm : '0'}
-                      </td>
-                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-medium text-slate-400">
-                        {row.downtime_backlog ? row.downtime_backlog : ''}
-                      </td>
-                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-medium text-slate-400">
-                        {row.downtime_midlife ? row.downtime_midlife : ''}
-                      </td>
-                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-medium text-slate-400">
-                        {row.downtime_pcr ? row.downtime_pcr : ''}
-                      </td>
-
-                      {/* GANTT DAY CELLS */}
+                      {/* GANTT DAY CELLS (H-1 s/d H-30/31) */}
                       {dayArray.map(d => (
                         <JamCell
                           key={d}
@@ -1167,15 +1268,28 @@ export const TargetJamOperasiView: React.FC<Props> = ({
                         />
                       ))}
 
-                      {/* TOTAL DOWNTIME */}
+                      {/* TERJADWAL GANTT (TOTAL DOWNTIME DI KALENDER) */}
                       <td className="border border-slate-300 dark:border-slate-700 px-2 py-1 text-center font-black text-slate-900 dark:text-white bg-slate-100/70 dark:bg-slate-800/60">
-                        {dtTotal}
+                        {ganttDT}h
                       </td>
 
-                      {/* PA % */}
+                      {/* SELISIH BD: Rencana vs Terjadwal */}
+                      <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center font-bold">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
+                          selisihBD === 0
+                            ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60'
+                            : selisihBD > 0
+                            ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60'
+                            : 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60'
+                        }`}>
+                          {selisihBD === 0 ? '0h' : selisihBD > 0 ? `+${selisihBD}h` : `${selisihBD}h`}
+                        </span>
+                      </td>
+
+                      {/* PROYEKSI PA (%) */}
                       <td className="border border-slate-300 dark:border-slate-700 px-1 py-1 text-center">
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
-                          Number(paPercent) >= 90
+                          Number(paPercent) >= 88
                             ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60'
                             : Number(paPercent) >= 80
                             ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60'
@@ -1191,14 +1305,14 @@ export const TargetJamOperasiView: React.FC<Props> = ({
                           <button
                             onClick={() => { setEditRow(row); setModalOpen(true); }}
                             className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-blue-600 cursor-pointer transition-colors"
-                            title="Edit Data Unit"
+                            title="Edit Rencana 1 Bulan Unit"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteRow(row)}
                             className="p-1 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-600 cursor-pointer transition-colors"
-                            title="Hapus Unit"
+                            title="Hapus Rencana Unit"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1214,31 +1328,49 @@ export const TargetJamOperasiView: React.FC<Props> = ({
             {filteredRows.length > 0 && (
               <tfoot>
                 <tr className="bg-[#2a303c] text-white text-[10px] font-black uppercase">
+                  {/* Sticky Footer Label */}
                   <td colSpan={5} className="border border-slate-600 px-3 py-2 text-right sticky left-0 z-30 bg-[#2a303c]">
-                    TOTAL FLEET SUMMARY ({filteredRows.length} UNIT)
+                    TOTAL FLEET PLAN ({filteredRows.length} UNIT)
                   </td>
-                  <td colSpan={6} className="border border-slate-600 px-2 py-2 text-center text-slate-300">
-                    {totalPM250 + totalPM500 + totalPM1000 + totalPM2000 + totalPM4000} PM Scheduled
+
+                  {/* Totals Target Operasi */}
+                  <td className="border border-slate-600 px-1 py-2 text-center text-slate-300">
+                    {formatNumber(filteredRows.length * calendarHoursPerUnit)}h
                   </td>
-                  {/* PM Type Counts */}
+                  <td className="border border-slate-600 px-1 py-2 text-center text-blue-300">
+                    {formatNumber(filteredRows.reduce((s, r) => s + (r.target_operating_hours ?? 500), 0))}h
+                  </td>
+                  <td className="border border-slate-600 px-1 py-2 text-center text-emerald-300">
+                    {(filteredRows.reduce((s, r) => s + (r.target_pa ?? 88.0), 0) / (filteredRows.length || 1)).toFixed(1)}%
+                  </td>
+
+                  {/* Totals Rencana BD 1 Bulan */}
+                  <td className="border border-slate-600 px-1 py-2 text-center text-rose-200">
+                    {filteredRows.reduce((s, r) => s + (r.downtime_pm || 0), 0)}
+                  </td>
+                  <td className="border border-slate-600 px-1 py-2 text-center text-amber-200">
+                    {filteredRows.reduce((s, r) => s + (r.downtime_backlog || 0), 0)}
+                  </td>
+                  <td className="border border-slate-600 px-1 py-2 text-center text-purple-200">
+                    {filteredRows.reduce((s, r) => s + (r.downtime_midlife || 0), 0)}
+                  </td>
+                  <td className="border border-slate-600 px-1 py-2 text-center text-teal-200">
+                    {filteredRows.reduce((s, r) => s + (r.downtime_pcr || 0), 0)}
+                  </td>
+                  <td className="border border-slate-600 px-1 py-2 text-center text-rose-300">
+                    {filteredRows.reduce((s, r) => s + (r.downtime_unscheduled || 0), 0)}
+                  </td>
+                  <td className="border border-slate-600 px-1.5 py-2 text-center font-black text-rose-300 bg-rose-950/80">
+                    {filteredRows.reduce((s, r) => s + getTotalPlannedBD(r), 0)}h
+                  </td>
+
+                  {/* Totals PM Event Counts */}
                   <td className="border border-slate-600 px-1 py-2 text-center text-rose-300">{totalPM250}</td>
                   <td className="border border-slate-600 px-1 py-2 text-center text-rose-300">{totalPM500}</td>
                   <td className="border border-slate-600 px-1 py-2 text-center text-rose-300">{totalPM1000}</td>
                   <td className="border border-slate-600 px-1 py-2 text-center text-rose-300">{totalPM2000}</td>
                   <td className="border border-slate-600 px-1 py-2 text-center text-rose-300">{totalPM4000}</td>
-                  {/* Downtime Sum */}
-                  <td className="border border-slate-600 px-1 py-2 text-center">
-                    {filteredRows.reduce((s, r) => s + (r.downtime_pm || 0), 0)}
-                  </td>
-                  <td className="border border-slate-600 px-1 py-2 text-center">
-                    {filteredRows.reduce((s, r) => s + (r.downtime_backlog || 0), 0)}
-                  </td>
-                  <td className="border border-slate-600 px-1 py-2 text-center">
-                    {filteredRows.reduce((s, r) => s + (r.downtime_midlife || 0), 0)}
-                  </td>
-                  <td className="border border-slate-600 px-1 py-2 text-center">
-                    {filteredRows.reduce((s, r) => s + (r.downtime_pcr || 0), 0)}
-                  </td>
+
                   {/* Day Columns Totals */}
                   {dayArray.map(d => {
                     const dayTotal = filteredRows.reduce((s, r) => s + getJam(r.equip_no, d), 0);
@@ -1248,12 +1380,22 @@ export const TargetJamOperasiView: React.FC<Props> = ({
                       </td>
                     );
                   })}
-                  <td className="border border-slate-600 px-2 py-2 text-center text-rose-300">
-                    {totalFleetDowntime}
+
+                  {/* Total Terjadwal Gantt */}
+                  <td className="border border-slate-600 px-2 py-2 text-center text-slate-100 font-black">
+                    {filteredRows.reduce((s, r) => s + getTotalGanttDowntime(r.equip_no), 0)}h
                   </td>
-                  <td className="border border-slate-600 px-1 py-2 text-center text-emerald-300">
+
+                  {/* Total Selisih BD */}
+                  <td className="border border-slate-600 px-1 py-2 text-center font-black text-amber-300">
+                    {filteredRows.reduce((s, r) => s + (getTotalPlannedBD(r) - getTotalGanttDowntime(r.equip_no)), 0)}h
+                  </td>
+
+                  {/* Fleet Projected PA % */}
+                  <td className="border border-slate-600 px-1 py-2 text-center font-black text-emerald-300">
                     {projectedFleetPA}%
                   </td>
+
                   <td className="border border-slate-600 px-1 py-2 text-center print:hidden">-</td>
                 </tr>
               </tfoot>
@@ -1262,7 +1404,7 @@ export const TargetJamOperasiView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Modal Dialog */}
+      {/* Modal Dialog (Rencana 1 Bulan) */}
       <ModalForm
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}

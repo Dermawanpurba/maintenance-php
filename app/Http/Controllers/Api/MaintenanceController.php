@@ -43,6 +43,8 @@ use App\Models\TargetJamHarian;
 use App\Models\PartService;
 use App\Models\WorkOrderPart;
 use App\Models\MasterModel;
+use App\Models\PsSchedule;
+use App\Models\PsScheduleBacklog;
 
 class MaintenanceController extends Controller
 {
@@ -336,6 +338,22 @@ class MaintenanceController extends Controller
                 case 'seedPartServices':
                     return response()->json($this->seedPartServices($data));
 
+                // PS Schedule Service (Closed-Loop Maintenance System)
+                case 'getPsSchedules':
+                    return response()->json($this->getPsSchedules($data));
+
+                case 'savePsScheduleItem':
+                    return response()->json($this->savePsScheduleItem($data));
+
+                case 'deletePsScheduleItem':
+                    return response()->json($this->deletePsScheduleItem($data));
+
+                case 'autoBundleUnitForPs':
+                    return response()->json($this->autoBundleUnitForPs($data));
+
+                case 'executePsScheduleDone':
+                    return response()->json($this->executePsScheduleDone($data));
+
                 default:
                     return response()->json(['success' => false, 'message' => "Action '{$action}' tidak dikenal"]);
             }
@@ -549,6 +567,9 @@ class MaintenanceController extends Controller
                     'downtime_backlog'         => ['double', 0],
                     'downtime_midlife'         => ['double', 0],
                     'downtime_pcr'             => ['double', 0],
+                    'downtime_unscheduled'     => ['double', 0],
+                    'target_operating_hours'   => ['double', 500],
+                    'target_pa'                => ['double', 88.0],
                 ];
                 foreach ($cols as $col => [$type, $default]) {
                     if (!Schema::hasColumn('target_jam_operasi', $col)) {
@@ -905,6 +926,11 @@ class MaintenanceController extends Controller
             'targetJamOperasi' => $this->safelyFetch(fn() => TargetJamOperasi::orderBy('section')->orderBy('equip_no')->get()->toArray(), []),
             'targetJamHarian' => $this->safelyFetch(fn() => TargetJamHarian::all()->toArray(), []),
             'partServices' => $this->safelyFetch(fn() => PartService::orderBy('equipment')->orderBy('model')->orderBy('id')->get()->toArray(), []),
+            'psSchedules' => $this->safelyFetch(fn() => PsSchedule::with('backlogItems')->orderBy('schedule_date', 'desc')->orderBy('plan_start_time', 'asc')->get()->map(function($s) {
+                $arr = $s->toArray();
+                $arr['backlogs'] = $s->backlogItems ? $s->backlogItems->toArray() : [];
+                return $arr;
+            })->values()->all(), []),
         ];
     }
 
@@ -2285,10 +2311,19 @@ class MaintenanceController extends Controller
                 ->first();
 
             if ($existing) {
+                // Pertahankan nilai spesifik rencana 1 bulan jika sudah ada kustomisasi
+                $targetData['downtime_midlife']       = floatval($existing->downtime_midlife ?? 0);
+                $targetData['downtime_pcr']           = floatval($existing->downtime_pcr ?? 0);
+                $targetData['downtime_unscheduled']   = floatval($existing->downtime_unscheduled ?? ($isBD ? ($daysInMonth * 24) : 0));
+                $targetData['target_operating_hours'] = floatval($existing->target_operating_hours ?? ($isBD ? 0 : 500));
+                $targetData['target_pa']              = floatval($existing->target_pa ?? ($isBD ? 0 : 88.0));
                 $existing->update($targetData);
             } else {
-                $targetData['downtime_midlife'] = 0;
-                $targetData['downtime_pcr']     = 0;
+                $targetData['downtime_midlife']       = 0;
+                $targetData['downtime_pcr']           = 0;
+                $targetData['downtime_unscheduled']   = $isBD ? ($daysInMonth * 24) : 0;
+                $targetData['target_operating_hours'] = $isBD ? 0 : 500;
+                $targetData['target_pa']              = $isBD ? 0 : 88.0;
                 TargetJamOperasi::create($targetData);
             }
 
@@ -2365,6 +2400,9 @@ class MaintenanceController extends Controller
             'downtime_backlog'         => floatval($data['downtime_backlog']?? 0),
             'downtime_midlife'         => floatval($data['downtime_midlife']?? 0),
             'downtime_pcr'             => floatval($data['downtime_pcr']    ?? 0),
+            'downtime_unscheduled'     => floatval($data['downtime_unscheduled'] ?? 0),
+            'target_operating_hours'   => floatval($data['target_operating_hours'] ?? 500),
+            'target_pa'                => floatval($data['target_pa'] ?? 88.0),
             'plan_year'                => $year,
             'plan_month'               => $month,
         ];
@@ -2609,6 +2647,442 @@ class MaintenanceController extends Controller
             'message' => 'Master database part service berhasil di-reset ke format matrix OEM (DT, Exca, Dozer, Greder)',
             'data' => $parts,
             'count' => $parts->count(),
+        ];
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PS Schedule Service Methods (Closed-Loop Maintenance System)
+    // ─────────────────────────────────────────────────────────────────
+
+    public function getPsSchedules($data = [])
+    {
+        $date = $data['schedule_date'] ?? null;
+        $subSection = $data['sub_section'] ?? 'ALL';
+
+        $query = PsSchedule::with('backlogItems');
+        if (!empty($date)) {
+            $query->where('schedule_date', $date);
+        }
+        if (!empty($subSection) && $subSection !== 'ALL') {
+            $query->where('sub_section', $subSection);
+        }
+
+        $schedules = $query->orderBy('plan_start_time', 'asc')->get()->map(function($s) {
+            $arr = $s->toArray();
+            $arr['backlogs'] = $s->backlogItems ? $s->backlogItems->toArray() : [];
+            return $arr;
+        });
+
+        return [
+            'success' => true,
+            'data' => $schedules,
+            'count' => $schedules->count(),
+        ];
+    }
+
+    public function savePsScheduleItem($data = [])
+    {
+        $id = $data['id'] ?? null;
+        $equipNo = $data['equip_no'] ?? null;
+        if (blank($equipNo)) {
+            return ['success' => false, 'message' => 'Nomor unit wajib diisi'];
+        }
+
+        $woNo = $data['wo_no'] ?? null;
+        if (blank($woNo)) {
+            $woNo = '22018' . rand(10000, 99999);
+        }
+        $notifNo = $data['notif_no'] ?? null;
+        if (blank($notifNo)) {
+            $notifNo = '12000' . rand(4100000, 4299999);
+        }
+        $resrvNo = $data['resrv_no'] ?? null;
+        if (blank($resrvNo)) {
+            $resrvNo = '58' . rand(10000, 99999);
+        }
+
+        $scheduleData = [
+            'schedule_date'    => $data['schedule_date'] ?? date('Y-m-d'),
+            'equip_no'         => $equipNo,
+            'code_number'      => $data['code_number'] ?? $equipNo,
+            'model'            => $data['model'] ?? (MasterEquip::where('equip_no', $equipNo)->value('model') ?? ''),
+            'current_hm'       => floatval($data['current_hm'] ?? 0),
+            'plan_hm'          => floatval($data['plan_hm'] ?? 0),
+            'ps_type'          => (string)($data['ps_type'] ?? '250'),
+            'plan_start_date'  => $data['plan_start_date'] ?? ($data['schedule_date'] ?? date('Y-m-d')),
+            'plan_start_time'  => $data['plan_start_time'] ?? '07:30',
+            'est_hours'        => floatval($data['est_hours'] ?? 1.0),
+            'sub_section'      => $data['sub_section'] ?? 'SUPPORT MEDIUM',
+            'pic'              => $data['pic'] ?? 'Planner',
+            'location'         => $data['location'] ?? (MasterEquip::where('equip_no', $equipNo)->value('location') ?? 'PLD'),
+            'wo_no'            => $woNo,
+            'notif_no'         => $notifNo,
+            'resrv_no'         => $resrvNo,
+            'av_parts_percent' => floatval($data['av_parts_percent'] ?? 100.0),
+            'pap_ref'          => $data['pap_ref'] ?? null,
+            'ppa_ref'          => $data['ppa_ref'] ?? null,
+            'dms_ref'          => $data['dms_ref'] ?? null,
+            'ppm_ref'          => $data['ppm_ref'] ?? null,
+            'ppe_ref'          => $data['ppe_ref'] ?? null,
+            'ppc_ref'          => $data['ppc_ref'] ?? null,
+            'vis_ref'          => $data['vis_ref'] ?? null,
+            'status'           => $data['status'] ?? 'SCHEDULED',
+            'notes'            => $data['notes'] ?? null,
+        ];
+
+        $schedule = PsSchedule::updateOrCreate(['id' => $id], $scheduleData);
+
+        // Sync backlog items jika disertakan
+        if (isset($data['backlogs']) && is_array($data['backlogs'])) {
+            PsScheduleBacklog::where('ps_schedule_id', $schedule->id)->delete();
+
+            foreach ($data['backlogs'] as $bl) {
+                if (!empty($bl['description'])) {
+                    PsScheduleBacklog::create([
+                        'ps_schedule_id'   => $schedule->id,
+                        'backlog_id'       => $bl['backlog_id'] ?? null,
+                        'wo_no'            => $bl['wo_no'] ?? ('22017' . rand(10000, 99999)),
+                        'notif_no'         => $bl['notif_no'] ?? ('12000' . rand(4100000, 4299999)),
+                        'resrv_no'         => $bl['resrv_no'] ?? ('53' . rand(10000, 99999)),
+                        'av_parts_percent' => floatval($bl['av_parts_percent'] ?? 100.0),
+                        'description'      => $bl['description'],
+                        'status'           => $bl['status'] ?? 'PENDING',
+                    ]);
+                }
+            }
+        }
+
+        $schedule->load('backlogItems');
+        $this->logAction('Save_PsSchedule', "Simpan jadwal servis {$equipNo} tanggal {$schedule->schedule_date}", 'PLANNER');
+
+        return [
+            'success' => true,
+            'message' => 'Jadwal servis berkala berhasil disimpan',
+            'schedule' => $schedule,
+        ];
+    }
+
+    public function deletePsScheduleItem($data = [])
+    {
+        $id = $data['id'] ?? null;
+        if (!$id) {
+            return ['success' => false, 'message' => 'ID jadwal tidak ditemukan'];
+        }
+
+        PsScheduleBacklog::where('ps_schedule_id', $id)->delete();
+        PsSchedule::where('id', $id)->delete();
+        $this->logAction('Delete_PsSchedule', "Hapus jadwal servis ID {$id}", 'PLANNER');
+
+        return ['success' => true, 'message' => 'Jadwal servis berhasil dihapus'];
+    }
+
+    public function autoBundleUnitForPs($data = [])
+    {
+        $equipNo = $data['equip_no'] ?? null;
+        if (blank($equipNo)) {
+            return ['success' => false, 'message' => 'Nomor unit wajib diisi'];
+        }
+
+        $equip = MasterEquip::where('equip_no', $equipNo)
+            ->orWhere('serial_no', $equipNo)
+            ->first();
+
+        // Fallback jika unit dicari via code_number di ps_schedules
+        if (!$equip) {
+            $existingPs = PsSchedule::where('equip_no', $equipNo)
+                ->orWhere('code_number', $equipNo)
+                ->first();
+            if ($existingPs) {
+                $equip = (object)[
+                    'equip_no'  => $existingPs->equip_no,
+                    'model'     => $existingPs->model,
+                    'unit_type' => $existingPs->sub_section,
+                    'location'  => $existingPs->location,
+                    'last_hm'   => $existingPs->current_hm,
+                ];
+            }
+        }
+
+        if (!$equip) {
+            return ['success' => false, 'message' => "Unit {$equipNo} tidak ditemukan di Master Data"];
+        }
+
+        // 1. Ambil HM Terkini (dari DailyHm terbaru atau master_equips.last_hm)
+        $latestDailyHm = DailyHm::where('equip_no', $equipNo)
+            ->orderByDesc('tanggal')
+            ->orderByDesc('id')
+            ->value('hm_akhir');
+        $currentHm = floatval($latestDailyHm ?: ($equip->last_hm ?: 0));
+
+        // 2. Ambil Plan HM & PS Type dari plan_services jika ada
+        $planService = PlanService::where('equip_no', $equipNo)->first();
+        $nextHm = $planService ? floatval($planService->next_service_hm) : 0;
+        if ($nextHm <= 0 && $currentHm > 0) {
+            $nextHm = ceil($currentHm / 250) * 250;
+            if ($nextHm == $currentHm) $nextHm += 250;
+        }
+
+        // Tentukan kelipatan PS (250, 500, 1000, 2000, 4000)
+        $psType = '250';
+        if ($nextHm > 0) {
+            if ($nextHm % 4000 === 0) $psType = '4000';
+            elseif ($nextHm % 2000 === 0) $psType = '2000';
+            elseif ($nextHm % 1000 === 0) $psType = '1000';
+            elseif ($nextHm % 500 === 0) $psType = '500';
+            else $psType = '250';
+        }
+
+        // 3. Sub-section & Estimasi durasi (HRS) berdasarkan jenis armada
+        $unitType = strtoupper($equip->unit_type ?? '');
+        $model = strtoupper($equip->model ?? '');
+        $subSection = 'SUPPORT MEDIUM';
+        $estHours = 4.0;
+        $pic = 'Mekanik PM';
+
+        if (str_contains($model, 'TOWER') || str_contains($model, 'GENSET') || str_contains($model, 'GE500') || str_contains($model, 'VT100') || str_contains($model, 'TL001') || str_contains($model, 'PL100') || str_contains($model, 'X-START') || str_contains($unitType, 'TOWER') || str_contains($unitType, 'GENSET')) {
+            $subSection = 'POWER PLANT';
+            $estHours = 0.8;
+            $pic = 'AGUS R';
+        } elseif (str_contains($model, 'HD785') || str_contains($model, 'WT') || str_contains($model, '777') || str_contains($model, '785') || str_contains($unitType, 'BIG') || str_contains($unitType, 'DUMP TRUCK')) {
+            $subSection = 'SUPPORT BIG';
+            $estHours = 6.0;
+            $pic = 'DERY W';
+        } elseif (str_contains($unitType, 'EXCA') || str_contains($unitType, 'DOZER') || str_contains($unitType, 'LOADER')) {
+            $subSection = 'SUPPORT MEDIUM';
+            $estHours = 8.0;
+            $pic = 'INDRA S';
+        }
+
+        // 4. Auto Cross-Reference: PAP (Oil Sample SOS)
+        $latestOil = OilSample::where('equip_no', $equipNo)->orderByDesc('sample_date')->orderByDesc('id')->first();
+        $papRef = $latestOil ? ($latestOil->sample_code ?: "PAP-{$latestOil->id}") : null;
+
+        // 5. Auto Cross-Reference: PPC (PPU / Undercarriage)
+        $latestPpu = PpuRecord::where('unit_no', $equipNo)->orderByDesc('id')->first();
+        $ppcRef = $latestPpu ? "PPU-0{$latestPpu->id}" : null;
+
+        // 6. Auto Cross-Reference: VIS (Inspeksi Visual P2H)
+        $latestInsp = Inspection::where('equip_no', $equipNo)->orderByDesc('tanggal')->orderByDesc('id')->first();
+        $visRef = $latestInsp ? ($latestInsp->item_id ?: "INSP-{$latestInsp->id}") : null;
+
+        // 6b. Auto Cross-Reference: PPM (Program Pemeriksaan Mesin / PM Record)
+        $latestPm = PmRecord::where('equip_no', $equipNo)->orderByDesc('tanggal')->orderByDesc('id')->first();
+        $ppmRef = $latestPm ? ($latestPm->item_id ?: "PM-{$latestPm->id}") : null;
+
+        // 6c. Auto Cross-Reference: DMS (Defect Management / Failure Analysis)
+        $latestFa = FailureAnalysis::where('equip_no', $equipNo)->orderByDesc('tanggal')->first();
+        $dmsRef = $latestFa ? ($latestFa->item_id ?: null) : null;
+
+        // 6d. Auto Cross-Reference: PPE (Program Pemeriksaan Elektrikal)
+        $latestEl = WorkOrder::where('equip_no', $equipNo)->where(function($q) {
+            $q->where('major_comp', 'ELECTRICAL')
+              ->orWhere('kendala', 'LIKE', '%kelistrikan%')
+              ->orWhere('kendala', 'LIKE', '%alternator%')
+              ->orWhere('kendala', 'LIKE', '%ECM%');
+        })->orderByDesc('tgl_input')->first();
+        $ppeRef = $latestEl ? ($latestEl->no_wo ?: null) : null;
+
+        $ppaRef = "PPA-" . str_replace('-', '', $equipNo);
+
+        // 7. Auto Bundling Backlogs: Ambil semua defect OPEN milik unit
+        $openBacklogs = Backlog::where('equip_no', $equipNo)
+            ->where(function($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', 'OPEN')
+                  ->orWhere('status', 'PENDING')
+                  ->orWhere('status', 'APPROVED');
+            })
+            ->get();
+
+        $bundledBacklogs = [];
+        foreach ($openBacklogs as $b) {
+            $bundledBacklogs[] = [
+                'backlog_id'       => $b->item_id ?: $b->id,
+                'wo_no'            => $b->no_wo ?: ('22017' . rand(10000, 99999)),
+                'notif_no'         => '12000' . rand(4100000, 4299999),
+                'resrv_no'         => '53' . rand(10000, 99999),
+                'av_parts_percent' => 100.0,
+                'description'      => $b->deskripsi_backlog ?: ($b->deskripsi ?: 'Perbaikan defect temuan'),
+                'status'           => 'PENDING'
+            ];
+        }
+
+        // 8. Hitung Parts Availability % berdasarkan part_services vs stok gudang
+        $avPartsPercent = 100.0;
+        $matchedBOM = PartService::where(function($q) use ($model, $unitType) {
+            $q->where('model', 'LIKE', "%{$model}%")
+              ->orWhere('equipment', 'LIKE', "%{$unitType}%");
+        })->get();
+
+        if ($matchedBOM->isNotEmpty()) {
+            $colName = "ps_" . intval($psType);
+            $totalPartsNeeded = 0;
+            $partsAvailable = 0;
+
+            foreach ($matchedBOM as $bom) {
+                $qtyNeeded = floatval($bom->{$colName} ?? 0);
+                if ($qtyNeeded > 0) {
+                    $totalPartsNeeded++;
+                    $stock = MasterPart::where('part_number', $bom->part_number)->value('stock') ?? 0;
+                    if ($stock >= $qtyNeeded) {
+                        $partsAvailable++;
+                    }
+                }
+            }
+
+            if ($totalPartsNeeded > 0) {
+                $avPartsPercent = round(($partsAvailable / $totalPartsNeeded) * 100, 1);
+                if ($avPartsPercent >= 95) $avPartsPercent = 100.0;
+                elseif ($avPartsPercent >= 80) $avPartsPercent = 98.0;
+            }
+        }
+
+        // 9. Format nomor tiket resmi SAP
+        $woNo = '22018' . rand(10000, 99999);
+        $notifNo = '12000' . rand(4100000, 4299999);
+        $resrvNo = '58' . rand(10000, 99999);
+
+        return [
+            'success' => true,
+            'message' => 'Auto-bundling berhasil dikalkulasi',
+            'bundle' => [
+                'equip_no'         => $equipNo,
+                'code_number'      => $equipNo,
+                'model'            => $equip->model ?: $model,
+                'current_hm'       => $currentHm,
+                'plan_hm'          => $nextHm ?: $currentHm,
+                'ps_type'          => $psType,
+                'plan_start_date'  => date('Y-m-d'),
+                'plan_start_time'  => '07:30',
+                'est_hours'        => $estHours,
+                'sub_section'      => $subSection,
+                'pic'              => $pic,
+                'location'         => $equip->location ?: 'PLD',
+                'wo_no'            => $woNo,
+                'notif_no'         => $notifNo,
+                'resrv_no'         => $resrvNo,
+                'av_parts_percent' => $avPartsPercent,
+                'pap_ref'          => $papRef,
+                'ppa_ref'          => $ppaRef,
+                'dms_ref'          => $dmsRef,
+                'ppm_ref'          => $ppmRef,
+                'ppe_ref'          => $ppeRef,
+                'ppc_ref'          => $ppcRef,
+                'vis_ref'          => $visRef,
+                'status'           => 'SCHEDULED',
+                'backlogs'         => $bundledBacklogs,
+            ]
+        ];
+    }
+
+    public function executePsScheduleDone($data = [])
+    {
+        $id = $data['id'] ?? null;
+        if (!$id) {
+            return ['success' => false, 'message' => 'ID jadwal servis diperlukan'];
+        }
+
+        $schedule = PsSchedule::with('backlogItems')->find($id);
+        if (!$schedule) {
+            return ['success' => false, 'message' => 'Jadwal servis tidak ditemukan'];
+        }
+
+        $equipNo = $schedule->equip_no;
+        $actualHm = floatval($data['actual_hm'] ?? ($schedule->actual_hm ?: ($schedule->current_hm ?: 0)));
+        $actualDate = $data['actual_date'] ?? date('Y-m-d');
+        $mechanic = $data['pic'] ?? ($schedule->pic ?: 'Mekanik PM');
+
+        // 1. Update status PsSchedule menjadi DONE
+        $schedule->update([
+            'status'           => 'DONE',
+            'actual_hm'        => $actualHm,
+            'actual_end_time'  => date('H:i'),
+            'notes'            => trim(($schedule->notes ?? '') . " | Eksekusi servis selesai pada {$actualDate} HM {$actualHm}"),
+        ]);
+
+        // 2. Buat Catatan PM Record (Preventive Maintenance)
+        $pmTypeStr = "PS-" . $schedule->ps_type;
+        PmRecord::create([
+            'item_id'          => 'PM-' . uniqid(),
+            'tanggal'          => $actualDate,
+            'equip_no'         => $equipNo,
+            'pm_type'          => $pmTypeStr,
+            'hm_pm'            => $actualHm,
+            'washing_check'    => 'DONE',
+            'greasing_check'   => 'DONE',
+            'inspection_check' => 'DONE',
+            'torque_check'     => 'DONE',
+            'battery_check'    => 'DONE',
+            'mechanic'         => $mechanic,
+            'notes'            => "Closed-loop periodic service via PS Schedule #{$schedule->id} (WO: {$schedule->wo_no})",
+            'status'           => 'DONE',
+        ]);
+
+        // 3. Update PlanService untuk interval berikutnya
+        preg_match('/(\d+)/', (string)$schedule->ps_type, $matches);
+        $interval = isset($matches[1]) ? (int)$matches[1] : 250;
+        $nextHm = $actualHm + $interval;
+
+        PlanService::updateOrCreate(
+            ['equip_no' => $equipNo],
+            [
+                'last_service_hm'   => $actualHm,
+                'last_service_date' => $actualDate,
+                'next_service_hm'   => $nextHm,
+            ]
+        );
+
+        // 4. Catat di ServiceHistory
+        ServiceHistory::create([
+            'item_id'     => 'SH-' . uniqid(),
+            'equip_no'    => $equipNo,
+            'plan_hm'     => $schedule->plan_hm,
+            'plan_date'   => $schedule->schedule_date,
+            'actual_hm'   => $actualHm,
+            'actual_date' => $actualDate,
+            'timestamp'   => now()->toDateTimeString(),
+        ]);
+
+        // 5. Update MasterEquip last_hm dan kembalikan status ke RFU (Ready For Use)
+        $equip = MasterEquip::where('equip_no', $equipNo)->first();
+        if ($equip) {
+            $upd = ['status' => 'RFU'];
+            if ($actualHm > ($equip->last_hm ?? 0)) {
+                $upd['last_hm'] = $actualHm;
+            }
+            $equip->update($upd);
+        }
+
+        // 5b. Tutup juga WorkOrder utama jika terdaftar
+        if (!empty($schedule->wo_no) && Schema::hasTable('work_orders')) {
+            WorkOrder::where('no_wo', $schedule->wo_no)->update([
+                'status'      => 'CLOSED',
+                'tgl_selesai' => $actualDate,
+                'jam_selesai' => date('H:i'),
+            ]);
+        }
+
+        // 6. CLOSED LOOP: Tutup semua backlog defect yang dibundel ke jadwal ini
+        $closedCount = 0;
+        foreach ($schedule->backlogItems as $bi) {
+            $bi->update(['status' => 'COMPLETED']);
+            if ($bi->backlog_id) {
+                Backlog::where('item_id', $bi->backlog_id)
+                    ->orWhere('id', $bi->backlog_id)
+                    ->update([
+                        'status'    => 'CLOSED',
+                        'closed_at' => now(),
+                    ]);
+                $closedCount++;
+            }
+        }
+
+        $this->logAction('Execute_PS_Done', "Servis berkala {$equipNo} selesai di HM {$actualHm}. {$closedCount} backlog berhasil ditutup.", 'PLANNER');
+
+        return [
+            'success' => true,
+            'message' => "Servis berkala {$equipNo} berhasil diselesaikan. {$closedCount} backlog defect berhasil ditutup secara otomatis.",
+            'schedule' => $schedule->fresh(['backlogItems']),
         ];
     }
 }

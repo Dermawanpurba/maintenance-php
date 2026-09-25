@@ -34,6 +34,7 @@ import {
   Layers,
   Disc,
   Activity,
+  Calendar,
   CalendarDays,
   FolderKanban,
   ExternalLink,
@@ -72,6 +73,7 @@ export type NavTab =
   | 'meetings'
   | 'target_jam_operasi'
   | 'planning_part_service'
+  | 'ps_schedule'
   | 'fleet'
   | 'parts'
   | 'tools'
@@ -193,6 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     monthly_budget: 'plan',
     target_jam_operasi: 'plan',
     planning_part_service: 'plan',
+    ps_schedule: 'plan',
     meetings: 'plan',
 
     fleet: 'master',
@@ -352,12 +355,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ctaIcon: CalendarDays,
       ctaAction: 'target_jam_operasi',
       submenus: [
+        { id: 'ps_schedule', title: 'PS Schedule Service', icon: Calendar, iconColor: 'text-blue-500' },
         { id: 'monthly_budget', title: 'Budget & Realization', icon: Wallet, iconColor: 'text-emerald-500' },
         { id: 'target_jam_operasi', title: 'Target Jam Operasi', icon: CalendarDays, iconColor: 'text-blue-500' },
         { id: 'planning_part_service', title: 'Planning Part Service', icon: ClipboardList, iconColor: 'text-cyan-500' },
         { id: 'meetings', title: 'Notulen Rapat Plant', icon: FileText, iconColor: 'text-amber-500' }
       ],
       quickAccess: [
+        { title: 'Matriks PS Schedule Harian', tab: 'ps_schedule' },
         { title: 'Realisasi Biaya vs Anggaran', tab: 'monthly_budget' },
         { title: 'Kalkulasi Oli & Filter 1 Bulan', tab: 'planning_part_service' },
         { title: 'Notulen Evaluasi Mingguan', tab: 'meetings' }

@@ -331,5 +331,27 @@ export const api = {
   async seedPartServices() {
     return this.postAction('seedPartServices');
   },
+
+  // ==================== PS SCHEDULE SERVICE ====================
+  async getPsSchedules(schedule_date?: string, sub_section?: string) {
+    return this.postAction('getPsSchedules', { schedule_date, sub_section });
+  },
+
+  async savePsScheduleItem(data: any) {
+    return this.postAction('savePsScheduleItem', data);
+  },
+
+  async deletePsScheduleItem(id: number | string) {
+    return this.postAction('deletePsScheduleItem', { id });
+  },
+
+  async autoBundleUnitForPs(equip_no: string) {
+    return this.postAction('autoBundleUnitForPs', { equip_no });
+  },
+
+  async executePsScheduleDone(id: number | string, actual_hm?: number, actual_date?: string, pic?: string) {
+    return this.postAction('executePsScheduleDone', { id, actual_hm, actual_date, pic });
+  },
 };
+
 

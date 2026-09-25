@@ -162,14 +162,19 @@ const titles: Record<NavTab, { title: string; subtitle: string; tag: string }> =
     tag: 'COORDINATION'
   },
   target_jam_operasi: {
-    title: 'Target Jam Operasi — Plan Alat Bulanan',
-    subtitle: 'Rencana jam operasi harian per unit alat berat, next service, PM type, dan periode kalender',
-    tag: 'PLAN ALAT'
+    title: 'Target Jam Operasi — Rencana 1 Bulan',
+    subtitle: 'Target jam operasi (MoHH), alokasi rencana jam breakdown (PM, Backlog, Midlife, PCS/PCR), dan kalender harian',
+    tag: 'RENCANA 1 BULAN'
   },
   planning_part_service: {
     title: 'Planning Part Service — Estimasi Kebutuhan Bulanan',
     subtitle: 'Kalkulasi kebutuhan suku cadang, oli & filter 1 bulan berjalan berbasis Target Jam Operasi dan Master Part Service',
     tag: 'PART SERVICE PLANNING'
+  },
+  ps_schedule: {
+    title: 'PS Schedule Service — Closed-Loop Periodic Service',
+    subtitle: 'Jadwal harian/shift operasional terintegrasi: Setup Jam Mulai, Rantai Penomoran SAP (WO, Notif, Reservasi Part), Referensi Lab & Bundling Backlog',
+    tag: 'PERIODIC SERVICE'
   },
   fleet: {
     title: 'Master Unit & Monitoring Armada Alat Berat',

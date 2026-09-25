@@ -25,6 +25,9 @@ class TargetJamOperasi extends Model
         'downtime_backlog'         => 'float',
         'downtime_midlife'         => 'float',
         'downtime_pcr'             => 'float',
+        'downtime_unscheduled'     => 'float',
+        'target_operating_hours'   => 'float',
+        'target_pa'                => 'float',
         'pm_250'                   => 'integer',
         'pm_500'                   => 'integer',
         'pm_1000'                  => 'integer',
@@ -59,12 +62,13 @@ class TargetJamOperasi extends Model
              + ($this->pm_other ?? 0);
     }
 
-    /** Total downtime terencana (jam) */
+    /** Total downtime terencana 1 bulan (jam) */
     public function getTotalPlannedDowntimeAttribute(): float
     {
         return ($this->downtime_pm ?? 0)
              + ($this->downtime_backlog ?? 0)
              + ($this->downtime_midlife ?? 0)
-             + ($this->downtime_pcr ?? 0);
+             + ($this->downtime_pcr ?? 0)
+             + ($this->downtime_unscheduled ?? 0);
     }
 }

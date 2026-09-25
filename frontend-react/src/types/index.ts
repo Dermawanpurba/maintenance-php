@@ -7,6 +7,7 @@ export interface Equipment {
   unit_type?: string;
   model: string;
   lokasi: string;
+  location?: string;
   site?: string;
   status: string; // READY, BREAKDOWN, STANDBY, MAINTENANCE
   last_hm: number;
@@ -431,6 +432,9 @@ export interface TargetJamOperasi {
   downtime_backlog?: number;
   downtime_midlife?: number;
   downtime_pcr?: number;
+  downtime_unscheduled?: number;
+  target_operating_hours?: number;
+  target_pa?: number;
   ba_gg?: number;
   oil_fe?: number;
   pos?: number;
@@ -450,4 +454,53 @@ export interface TargetJamHarian {
   downtime_type?: 'PM' | 'BD' | 'BACKLOG' | 'MIDLIFE' | 'PCR' | string;
   created_at?: string;
   updated_at?: string;
+}
+
+// ==================== PS SCHEDULE SERVICE TYPES ====================
+export interface PsScheduleBacklogItem {
+  id?: number | string;
+  ps_schedule_id?: number | string;
+  backlog_id?: string;
+  wo_no?: string;
+  notif_no?: string;
+  resrv_no?: string;
+  av_parts_percent?: number;
+  description: string;
+  status?: string;
+  created_at?: string;
+}
+
+export interface PsScheduleItem {
+  id?: number | string;
+  schedule_date: string;
+  equip_no: string;
+  code_number?: string;
+  model: string;
+  current_hm: number;
+  plan_hm: number;
+  ps_type: string;
+  plan_start_date?: string;
+  plan_start_time: string;
+  est_hours: number;
+  sub_section: string;
+  pic: string;
+  location: string;
+  wo_no: string;
+  notif_no: string;
+  resrv_no: string;
+  av_parts_percent: number;
+  pap_ref?: string;
+  ppa_ref?: string;
+  dms_ref?: string;
+  ppm_ref?: string;
+  ppe_ref?: string;
+  ppc_ref?: string;
+  vis_ref?: string;
+  status: string; // SCHEDULED, IN_PROGRESS, DONE, CANCELLED
+  actual_start_time?: string;
+  actual_end_time?: string;
+  actual_hm?: number;
+  notes?: string;
+  backlogs?: PsScheduleBacklogItem[];
+  created_at?: string;
 }
